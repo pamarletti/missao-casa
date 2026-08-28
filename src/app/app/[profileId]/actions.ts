@@ -81,3 +81,34 @@ export async function decidir(eventId: string, decisao: Decisao) {
 
   revalidatePath(`/app/${active.profileId}`);
 }
+
+/** Um responsável credita ou debita manualmente o saldo (mesada virtual)
+ * de um menino — adiantamento, presente, correção de erro, etc. */
+export async function ajustarSaldo(formData: FormData) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const profileId = String(formData.get("profileId") || "");
+  const familyId = String(formData.get("familyId") || "");
+  const tipo = String(formData.get("tipo") || "adicionar");
+  const valorInformado = Number(String(formData.get("valor") || "0").replace(",", "."));
+  const motivo = String(formData.get("motivo") || "").trim() || null;
+
+  if (!profileId || !familyId || !Number.isFinite(valorInformado) || valorInformado <= 0) {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
+  const valor = tipo === "remover" ? -Math.abs(valorInformado) : Math.abs(valorInformado);
+
+  const supabase = createClient();
+  await supabase.from("saldo_ajustes").insert({
+    family_id: familyId,
+    profile_id: profileId,
+    valor,
+    motivo,
+    criado_por: active.profileId,
+  });
+
+  revalidatePath(`/app/${active.profileId}`);
+}

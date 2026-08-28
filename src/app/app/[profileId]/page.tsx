@@ -4,6 +4,7 @@ import { getActiveProfile } from "@/lib/activeProfile";
 import { trocarPerfil, logout } from "@/app/app/actions";
 import { markOrRequest, markColetivaDone } from "./actions";
 import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
+import SaldoCard from "@/components/SaldoCard";
 
 const CATEGORIA_LABEL: Record<string, string> = {
   individual: "Suas tarefas",
@@ -28,6 +29,8 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   const today = new Date().toISOString().slice(0, 10);
 
   if (profile.kind === "responsavel") {
+    const inicioMes = today.slice(0, 8) + "01";
+
     const { data: pending, error: pendingError } = await supabase
       .from("task_events")
       .select("id, status, valor, data, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
@@ -39,9 +42,54 @@ export default async function Dashboard({ params }: { params: { profileId: strin
       console.error("Erro ao buscar pendências:", pendingError.message);
     }
 
+    const { data: criancas } = await supabase
+      .from("profiles")
+      .select("id, name")
+      .eq("family_id", familyId)
+      .eq("kind", "crianca")
+      .order("name");
+
+    const { data: confirmadosMes, error: confirmadosError } = await supabase
+      .from("task_events")
+      .select("profile_id, valor")
+      .eq("family_id", familyId)
+      .eq("status", "confirmado")
+      .gte("data", inicioMes);
+    if (confirmadosError) {
+      console.error("Erro ao buscar tarefas confirmadas do mês:", confirmadosError.message);
+    }
+
+    const { data: ajustesMes, error: ajustesError } = await supabase
+      .from("saldo_ajustes")
+      .select("profile_id, valor")
+      .eq("family_id", familyId)
+      .gte("criado_em", `${inicioMes}T00:00:00`);
+    if (ajustesError) {
+      console.error("Erro ao buscar ajustes de saldo:", ajustesError.message);
+    }
+
+    const saldoPorPerfil = new Map<string, number>();
+    for (const e of confirmadosMes ?? []) {
+      saldoPorPerfil.set(e.profile_id, (saldoPorPerfil.get(e.profile_id) ?? 0) + Number(e.valor));
+    }
+    for (const a of ajustesMes ?? []) {
+      saldoPorPerfil.set(a.profile_id, (saldoPorPerfil.get(a.profile_id) ?? 0) + Number(a.valor));
+    }
+
     return (
       <Shell title={`Olá, ${profile.name}`} onLogout={logout} onTrocarPerfil={trocarPerfil}>
-        <h2 className="text-lg font-semibold mb-3">Pendências</h2>
+        <h2 className="text-lg font-semibold mb-3">Saldo do mês</h2>
+        {(criancas ?? []).map((crianca) => (
+          <SaldoCard
+            key={crianca.id}
+            profileId={crianca.id}
+            familyId={familyId}
+            name={crianca.name}
+            saldo={saldoPorPerfil.get(crianca.id) ?? 0}
+          />
+        ))}
+
+        <h2 className="text-lg font-semibold mb-3 mt-6">Pendências</h2>
         <ConfirmQueue familyId={familyId} events={(pending ?? []) as unknown as PendingEvent[]} />
       </Shell>
     );

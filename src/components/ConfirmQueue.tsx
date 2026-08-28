@@ -34,6 +34,11 @@ export default function ConfirmQueue({
         { event: "*", schema: "public", table: "task_events", filter: `family_id=eq.${familyId}` },
         () => router.refresh()
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "saldo_ajustes", filter: `family_id=eq.${familyId}` },
+        () => router.refresh()
+      )
       .subscribe();
 
     return () => {

@@ -28,12 +28,16 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   const today = new Date().toISOString().slice(0, 10);
 
   if (profile.kind === "responsavel") {
-    const { data: pending } = await supabase
+    const { data: pending, error: pendingError } = await supabase
       .from("task_events")
-      .select("id, status, valor, data, task_catalog(name), profiles(name)")
+      .select("id, status, valor, data, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
       .eq("family_id", familyId)
       .in("status", ["aguardando_autorizacao", "aguardando_confirmacao"])
       .order("created_at", { ascending: true });
+
+    if (pendingError) {
+      console.error("Erro ao buscar pendências:", pendingError.message);
+    }
 
     return (
       <Shell title={`Olá, ${profile.name}`} onLogout={logout} onTrocarPerfil={trocarPerfil}>

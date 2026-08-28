@@ -55,7 +55,7 @@ export default async function Dashboard({ params }: { params: { profileId: strin
       .from("task_events")
       .select("profile_id, valor")
       .eq("family_id", familyId)
-      .eq("status", "confirmado")
+      .in("status", ["confirmado", "desconto_automatico"])
       .gte("data", inicioMes);
     if (confirmadosError) console.error("Erro ao buscar tarefas confirmadas do mês:", confirmadosError.message);
 
@@ -151,9 +151,18 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   if (eventosMesError) console.error("Erro ao buscar eventos do mês:", eventosMesError.message);
 
   const eventos = eventosMes ?? [];
-  const saldoDoMes = eventos.filter((e) => e.status === "confirmado").reduce((acc, e) => acc + Number(e.valor), 0);
+  const saldoDoMes = eventos
+    .filter((e) => ["confirmado", "desconto_automatico"].includes(e.status))
+    .reduce((acc, e) => acc + Number(e.valor), 0);
   const feitasMes = eventos.filter((e) => e.status === "confirmado").length;
-  const naoFeitasMes = eventos.filter((e) => e.status === "nao_feito").length;
+  const naoFeitasMes = eventos.filter((e) => ["nao_feito", "desconto_automatico"].includes(e.status)).length;
+
+  const { count: numCriancasCount } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", familyId)
+    .eq("kind", "crianca");
+  const numCriancas = numCriancasCount && numCriancasCount > 0 ? numCriancasCount : 1;
 
   const { data: eventosHistoricoProprio, error: histProprioError } = await supabase
     .from("task_events")
@@ -203,6 +212,7 @@ export default async function Dashboard({ params }: { params: { profileId: strin
         saldoDoMes={saldoDoMes}
         feitasMes={feitasMes}
         naoFeitasMes={naoFeitasMes}
+        numCriancas={numCriancas}
       />
     </Shell>
   );

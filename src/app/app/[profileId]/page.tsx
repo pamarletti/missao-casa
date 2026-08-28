@@ -51,26 +51,27 @@ export default async function Dashboard({ params }: { params: { profileId: strin
       .eq("kind", "crianca")
       .order("name");
 
-    const { data: confirmadosMes, error: confirmadosError } = await supabase
+    // Saldo é acumulado (não zera no fim do mês) — só diminui quando o
+    // responsável registra uma retirada (usando "Remover" no ajuste manual
+    // de saldo). Por isso essas duas consultas não têm filtro de data.
+    const { data: confirmadosTotal, error: confirmadosError } = await supabase
       .from("task_events")
       .select("profile_id, valor")
       .eq("family_id", familyId)
-      .in("status", ["confirmado", "desconto_automatico"])
-      .gte("data", inicioMes);
-    if (confirmadosError) console.error("Erro ao buscar tarefas confirmadas do mês:", confirmadosError.message);
+      .in("status", ["confirmado", "desconto_automatico"]);
+    if (confirmadosError) console.error("Erro ao buscar tarefas confirmadas:", confirmadosError.message);
 
-    const { data: ajustesMes, error: ajustesError } = await supabase
+    const { data: ajustesTotal, error: ajustesError } = await supabase
       .from("saldo_ajustes")
       .select("profile_id, valor")
-      .eq("family_id", familyId)
-      .gte("criado_em", `${inicioMes}T00:00:00`);
+      .eq("family_id", familyId);
     if (ajustesError) console.error("Erro ao buscar ajustes de saldo:", ajustesError.message);
 
     const saldoPorPerfil: Record<string, number> = {};
-    for (const e of confirmadosMes ?? []) {
+    for (const e of confirmadosTotal ?? []) {
       saldoPorPerfil[e.profile_id] = (saldoPorPerfil[e.profile_id] ?? 0) + Number(e.valor);
     }
-    for (const a of ajustesMes ?? []) {
+    for (const a of ajustesTotal ?? []) {
       saldoPorPerfil[a.profile_id] = (saldoPorPerfil[a.profile_id] ?? 0) + Number(a.valor);
     }
 
@@ -151,11 +152,29 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   if (eventosMesError) console.error("Erro ao buscar eventos do mês:", eventosMesError.message);
 
   const eventos = eventosMes ?? [];
-  const saldoDoMes = eventos
-    .filter((e) => ["confirmado", "desconto_automatico"].includes(e.status))
-    .reduce((acc, e) => acc + Number(e.valor), 0);
   const feitasMes = eventos.filter((e) => e.status === "confirmado").length;
   const naoFeitasMes = eventos.filter((e) => ["nao_feito", "desconto_automatico"].includes(e.status)).length;
+
+  // Saldo é acumulado (não zera no fim do mês) — só diminui quando o
+  // responsável registra uma retirada. Por isso essas duas consultas não
+  // têm filtro de data, diferente de "eventosMes" acima (que é só pra
+  // acompanhar o progresso do mês corrente).
+  const { data: eventosConfirmadosTotal, error: eventosTotalError } = await supabase
+    .from("task_events")
+    .select("valor")
+    .eq("profile_id", profile.id)
+    .in("status", ["confirmado", "desconto_automatico"]);
+  if (eventosTotalError) console.error("Erro ao buscar total de tarefas confirmadas:", eventosTotalError.message);
+
+  const { data: ajustesTotalProprio, error: ajustesTotalError } = await supabase
+    .from("saldo_ajustes")
+    .select("valor")
+    .eq("profile_id", profile.id);
+  if (ajustesTotalError) console.error("Erro ao buscar total de ajustes:", ajustesTotalError.message);
+
+  const saldoAtual =
+    (eventosConfirmadosTotal ?? []).reduce((acc, e) => acc + Number(e.valor), 0) +
+    (ajustesTotalProprio ?? []).reduce((acc, a) => acc + Number(a.valor), 0);
 
   const { count: numCriancasCount } = await supabase
     .from("profiles")
@@ -209,7 +228,7 @@ export default async function Dashboard({ params }: { params: { profileId: strin
         catalog={catalog ?? []}
         eventosMes={eventos}
         atividades={atividades}
-        saldoDoMes={saldoDoMes}
+        saldoAtual={saldoAtual}
         feitasMes={feitasMes}
         naoFeitasMes={naoFeitasMes}
         numCriancas={numCriancas}

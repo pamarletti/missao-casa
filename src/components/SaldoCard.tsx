@@ -44,8 +44,8 @@ export default function SaldoCard({
               defaultValue="adicionar"
               className="bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-slate-100"
             >
-              <option value="adicionar">Adicionar</option>
-              <option value="remover">Remover</option>
+              <option value="adicionar">Adicionar (crédito extra)</option>
+              <option value="remover">Retirar / remover (pagamento)</option>
             </select>
             <input type="number" step="0.01" min="0" name="valor" placeholder="Valor" required className="flex-1" />
           </div>

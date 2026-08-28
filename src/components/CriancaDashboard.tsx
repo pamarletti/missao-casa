@@ -47,7 +47,7 @@ export default function CriancaDashboard({
   catalog,
   eventosMes,
   atividades,
-  saldoDoMes,
+  saldoAtual,
   feitasMes,
   naoFeitasMes,
   numCriancas,
@@ -57,7 +57,7 @@ export default function CriancaDashboard({
   catalog: Tarefa[];
   eventosMes: EventoMes[];
   atividades: AtividadeItem[];
-  saldoDoMes: number;
+  saldoAtual: number;
   feitasMes: number;
   naoFeitasMes: number;
   numCriancas: number;
@@ -213,8 +213,11 @@ export default function CriancaDashboard({
       {tab === "inicio" && (
         <>
           <div className="card mb-4">
-            <p className="text-slate-400 text-sm">Saldo confirmado este mês</p>
-            <p className="text-3xl font-bold text-casa-accent">R$ {saldoDoMes.toFixed(2)}</p>
+            <p className="text-slate-400 text-sm">Saldo disponível</p>
+            <p className="text-3xl font-bold text-casa-accent">R$ {saldoAtual.toFixed(2)}</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Vai acumulando de mês em mês — só sai quando um responsável retira.
+            </p>
           </div>
 
           <div className="card mb-4">

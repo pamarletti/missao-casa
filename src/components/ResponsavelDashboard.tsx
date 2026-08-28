@@ -60,7 +60,11 @@ export default function ResponsavelDashboard({
 
       {tab === "inicio" && (
         <>
-          <h2 className="text-lg font-semibold mb-3">Saldo do mês</h2>
+          <h2 className="text-lg font-semibold mb-3">Saldo acumulado</h2>
+          <p className="text-sm text-slate-400 -mt-2 mb-3">
+            Não zera no fim do mês — some as tarefas confirmadas e só diminui quando você registra uma retirada
+            abaixo ("Ajustar saldo" → "Remover").
+          </p>
           {criancas.map((c) => (
             <SaldoCard
               key={c.id}

@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-casa-bg text-slate-100 min-h-screen;
+}
+
+.card {
+  @apply bg-casa-card rounded-game shadow-lg p-5;
+}
+
+.btn {
+  @apply rounded-full px-5 py-2 font-semibold transition active:scale-95 disabled:opacity-40 disabled:active:scale-100;
+}
+
+.btn-primary {
+  @apply btn bg-casa-accent text-slate-900 hover:brightness-110;
+}
+
+.btn-secondary {
+  @apply btn bg-slate-700 text-slate-100 hover:bg-slate-600;
+}
+
+.btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-500;
+}
+
+input {
+  @apply bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-slate-100 w-full;
+}

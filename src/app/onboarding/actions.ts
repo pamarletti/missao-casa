@@ -1,0 +1,67 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { createHash } from "crypto";
+import { createClient } from "@/lib/supabase/server";
+
+function hashPin(pin: string) {
+  return createHash("sha256").update(pin).digest("hex");
+}
+
+export async function completeOnboarding(formData: FormData) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: family, error: familyError } = await supabase
+    .from("families")
+    .select("id")
+    .eq("owner_user_id", user!.id)
+    .single();
+
+  if (familyError || !family) {
+    redirect(`/onboarding?erro=${encodeURIComponent("Não encontrei a família. Tente entrar de novo.")}`);
+  }
+
+  const profiles: {
+    family_id: string;
+    name: string;
+    kind: "crianca" | "responsavel";
+    pin_hash: string | null;
+  }[] = [];
+
+  for (const key of ["responsavel1", "responsavel2"]) {
+    const nome = String(formData.get(`${key}_nome`) || "").trim();
+    const pin = String(formData.get(`${key}_pin`) || "").trim();
+    if (nome && pin) {
+      profiles.push({ family_id: family!.id, name: nome, kind: "responsavel", pin_hash: hashPin(pin) });
+    }
+  }
+
+  for (const key of ["crianca1", "crianca2", "crianca3", "crianca4"]) {
+    const nome = String(formData.get(`${key}_nome`) || "").trim();
+    if (nome) {
+      profiles.push({ family_id: family!.id, name: nome, kind: "crianca", pin_hash: null });
+    }
+  }
+
+  if (profiles.length === 0) {
+    redirect(`/onboarding?erro=${encodeURIComponent("Cadastre pelo menos um responsável e uma criança.")}`);
+  }
+
+  const { error: profilesError } = await supabase.from("profiles").insert(profiles);
+  if (profilesError) {
+    redirect(`/onboarding?erro=${encodeURIComponent(profilesError.message)}`);
+  }
+
+  const { error: seedError } = await supabase.rpc("seed_default_catalog", {
+    p_family_id: family!.id,
+  });
+  if (seedError) {
+    redirect(`/onboarding?erro=${encodeURIComponent("Perfis criados, mas o catálogo padrão falhou: " + seedError.message)}`);
+  }
+
+  redirect("/app");
+}

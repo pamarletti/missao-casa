@@ -263,6 +263,8 @@ function Shell({
         </div>
       </header>
       {children}
+
+      <p className="text-center text-sm font-semibold text-slate-500 mt-10 mb-2">Missão cumprida! 🎉</p>
     </main>
   );
 }

@@ -57,7 +57,7 @@ const TABS = [
   { key: "semana", label: "Esta semana" },
   { key: "coletivas", label: "Coletivas" },
   { key: "catalogo", label: "Catálogo" },
-  { key: "atividades", label: "Atividades" },
+  { key: "atividades", label: "Histórico de Atividades" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];

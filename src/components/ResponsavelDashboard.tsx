@@ -25,7 +25,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
 const TABS = [
   { key: "inicio", label: "Início" },
   { key: "catalogo", label: "Catálogo" },
-  { key: "atividades", label: "Atividades" },
+  { key: "atividades", label: "Histórico de Atividades" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];

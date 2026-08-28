@@ -4,6 +4,7 @@ import { getActiveProfile } from "@/lib/activeProfile";
 import { trocarPerfil, logout } from "@/app/app/actions";
 import ResponsavelDashboard from "@/components/ResponsavelDashboard";
 import CriancaDashboard from "@/components/CriancaDashboard";
+import BackToTopButton from "@/components/BackToTopButton";
 import type { PendingEvent } from "@/components/ConfirmQueue";
 import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes } from "@/lib/periodos";
@@ -250,7 +251,7 @@ function Shell({
 }) {
   return (
     <main className="min-h-screen p-4 max-w-lg mx-auto">
-      <p className="text-center text-sm font-semibold text-slate-400 mb-1">🏠 Missão Casa</p>
+      <p className="text-center text-lg font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
       <header className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">{title}</h1>
         <div className="flex gap-2">
@@ -264,7 +265,9 @@ function Shell({
       </header>
       {children}
 
-      <p className="text-center text-sm font-semibold text-slate-500 mt-10 mb-2">Missão cumprida! 🎉</p>
+      <p className="text-center text-2xl font-bold text-slate-400 mt-10 mb-4">Missão cumprida! 🎉</p>
+
+      <BackToTopButton />
     </main>
   );
 }

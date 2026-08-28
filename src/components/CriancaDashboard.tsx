@@ -268,6 +268,17 @@ export default function CriancaDashboard({
   );
   const valorEmRiscoSemana = semanaisEmRisco.reduce((acc, t) => acc + Number(t.valor_unitario), 0);
 
+  // "Tem um tempinho?": até 4 sugestões de tarefas rápidas pra fazer agora,
+  // priorizando obrigatórias diárias, depois semanais, depois coletivas.
+  // Só entram tarefas com alguma ação disponível nesse momento — sem
+  // nenhuma marcação ainda, ou coletivas já liberadas esperando só o
+  // "Feito" — nunca as que já foram feitas ou já estão decididas.
+  const coletivasSugeridas = coletivas.filter((t) => {
+    const evento = statusAtual(t.id, t.frequencia);
+    return !evento || evento.status === "liberada";
+  });
+  const sugestoesTempinho = [...diariasEmRisco, ...semanaisEmRisco, ...coletivasSugeridas].slice(0, 4);
+
   return (
     <div>
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
@@ -277,44 +288,19 @@ export default function CriancaDashboard({
           <div className="card mb-4">
             <p className="text-slate-400 text-sm">Saldo disponível</p>
             <p className="text-3xl font-bold text-casa-accent">R$ {saldoAtual.toFixed(2)}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Vai acumulando de mês em mês — só sai quando um responsável retira.
-            </p>
           </div>
 
           <div className="card mb-4">
-            <div className="flex justify-between text-sm text-slate-400 mb-1">
-              <span>Progresso do mês</span>
-              <span>
-                R$ {obrigatoriasFeitasMes.toFixed(2)} / R$ {potencialMes.toFixed(2)}
-              </span>
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
-              <div
-                className="bg-casa-accent h-3 rounded-full transition-all"
-                style={{ width: `${progressoMesPct}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-400 mt-2">
-              {metaMesBatida
-                ? "Você já garantiu o valor cheio do mês! 🎉"
-                : `Faltam R$ ${faltaMes.toFixed(2)} para completar o mês fazendo as obrigatórias.`}
-            </p>
-          </div>
-
-          <div className="card mb-4">
-            <div className="flex justify-between text-sm text-slate-400 mb-1">
-              <span>Progresso de hoje</span>
-              <span>
-                R$ {feitoHoje.toFixed(2)} / R$ {potencialDia.toFixed(2)}
-              </span>
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
-              <div
-                className="bg-casa-accent h-3 rounded-full transition-all"
-                style={{ width: `${progressoPct}%` }}
-              />
-            </div>
+            <p className="text-sm text-slate-400 mb-3">🙌 Tem um tempinho?</p>
+            {sugestoesTempinho.length > 0 ? (
+              <ul className="space-y-2">
+                {sugestoesTempinho.map((t) => (
+                  <TarefaRow key={t.id} t={t} />
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-green-400">Você já deu conta de tudo por enquanto! 🎉</p>
+            )}
           </div>
 
           <div className="card mb-4">
@@ -355,6 +341,52 @@ export default function CriancaDashboard({
             )}
           </div>
 
+          <div className="card mb-4">
+            <div className="flex justify-between text-sm text-slate-400 mb-1">
+              <span>Progresso de hoje</span>
+              <span>
+                R$ {feitoHoje.toFixed(2)} / R$ {potencialDia.toFixed(2)}
+              </span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-casa-accent h-3 rounded-full transition-all"
+                style={{ width: `${progressoPct}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="card mb-4">
+            <div className="flex justify-between text-sm text-slate-400 mb-1">
+              <span>Progresso do mês</span>
+              <span>
+                R$ {obrigatoriasFeitasMes.toFixed(2)} / R$ {potencialMes.toFixed(2)}
+              </span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-casa-accent h-3 rounded-full transition-all"
+                style={{ width: `${progressoMesPct}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              {metaMesBatida
+                ? "Você já garantiu o valor cheio do mês! 🎉"
+                : `Faltam R$ ${faltaMes.toFixed(2)} para completar o mês fazendo as obrigatórias.`}
+            </p>
+          </div>
+
+          <div className="card mb-6 flex justify-around text-center">
+            <div>
+              <p className="text-2xl font-bold text-green-400">{feitasMes}</p>
+              <p className="text-xs text-slate-400">feitas no mês</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-400">{naoFeitasMes}</p>
+              <p className="text-xs text-slate-400">não feitas no mês</p>
+            </div>
+          </div>
+
           <div className="card mb-6">
             <p className="text-sm text-slate-400 mb-2">Se fizer tudo que é obrigatório, dá pra chegar a:</p>
             <div className="flex justify-around text-center">
@@ -374,9 +406,7 @@ export default function CriancaDashboard({
           </div>
 
           <div className="card mb-6">
-            <p className="text-sm text-slate-400 mb-2">
-              Bônus extra fazendo tarefas coletivas - não tem limite:
-            </p>
+            <p className="text-sm text-slate-400 mb-2">Ainda dá para ganhar bônus sem limite:</p>
             <div className="flex justify-around text-center">
               <div>
                 <p className="font-bold text-green-400">R$ {bonusExtraDia.toFixed(2)}</p>
@@ -390,17 +420,6 @@ export default function CriancaDashboard({
                 <p className="font-bold text-green-400">R$ {bonusExtraMes.toFixed(2)}</p>
                 <p className="text-xs text-slate-400">por mês</p>
               </div>
-            </div>
-          </div>
-
-          <div className="card mb-6 flex justify-around text-center">
-            <div>
-              <p className="text-2xl font-bold text-green-400">{feitasMes}</p>
-              <p className="text-xs text-slate-400">feitas no mês</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-400">{naoFeitasMes}</p>
-              <p className="text-xs text-slate-400">não feitas no mês</p>
             </div>
           </div>
 

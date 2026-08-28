@@ -82,6 +82,47 @@ export async function decidir(eventId: string, decisao: Decisao) {
   revalidatePath(`/app/${active.profileId}`);
 }
 
+/** O próprio menino cancela uma marcação/pedido que ele fez e que ainda
+ * está esperando o responsável decidir — vira como se ele não tivesse
+ * marcado nada, sem precisar esperar um "não feito" pra tentar de novo. */
+export async function cancelarPropriaMarcacao(eventId: string) {
+  const active = await requireActiveProfile();
+  const supabase = createClient();
+
+  await supabase
+    .from("task_events")
+    .delete()
+    .eq("id", eventId)
+    .eq("profile_id", active.profileId)
+    .in("status", ["aguardando_autorizacao", "aguardando_confirmacao"]);
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** Um responsável desfaz qualquer evento já decidido (confirmado, não
+ * feito, liberado, pedido para refazer) — corrige um clique errado a
+ * qualquer momento, a partir do histórico de Atividades. */
+export async function desfazerEvento(eventId: string) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const supabase = createClient();
+  await supabase.from("task_events").delete().eq("id", eventId);
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** Um responsável desfaz um ajuste manual de saldo lançado por engano. */
+export async function desfazerAjuste(ajusteId: string) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const supabase = createClient();
+  await supabase.from("saldo_ajustes").delete().eq("id", ajusteId);
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
 /** Um responsável credita ou debita manualmente o saldo (mesada virtual)
  * de um menino — adiantamento, presente, correção de erro, etc. */
 export async function ajustarSaldo(formData: FormData) {

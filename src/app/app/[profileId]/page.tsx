@@ -2,14 +2,20 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveProfile } from "@/lib/activeProfile";
 import { trocarPerfil, logout } from "@/app/app/actions";
-import { markOrRequest, markColetivaDone } from "./actions";
-import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
-import SaldoCard from "@/components/SaldoCard";
+import ResponsavelDashboard from "@/components/ResponsavelDashboard";
+import CriancaDashboard from "@/components/CriancaDashboard";
+import type { PendingEvent } from "@/components/ConfirmQueue";
+import type { AtividadeItem } from "@/components/Atividades";
+import { inicioDoMes } from "@/lib/periodos";
 
-const CATEGORIA_LABEL: Record<string, string> = {
-  individual: "Suas tarefas",
-  individual_coletiva: "Do seu espaço (quarto)",
-  coletiva: "Tarefas coletivas (bônus)",
+const STATUS_LABEL: Record<string, string> = {
+  aguardando_autorizacao: "aguardando autorização",
+  liberada: "liberada",
+  aguardando_confirmacao: "aguardando confirmação",
+  confirmado: "confirmado",
+  nao_feito: "não feito",
+  pedido_para_refazer: "pedido para refazer",
+  desconto_automatico: "desconto automático",
 };
 
 export default async function Dashboard({ params }: { params: { profileId: string } }) {
@@ -27,20 +33,16 @@ export default async function Dashboard({ params }: { params: { profileId: strin
 
   const familyId = profile.family_id as string;
   const today = new Date().toISOString().slice(0, 10);
+  const inicioMes = inicioDoMes(today);
 
   if (profile.kind === "responsavel") {
-    const inicioMes = today.slice(0, 8) + "01";
-
     const { data: pending, error: pendingError } = await supabase
       .from("task_events")
       .select("id, status, valor, data, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
       .eq("family_id", familyId)
       .in("status", ["aguardando_autorizacao", "aguardando_confirmacao"])
       .order("created_at", { ascending: true });
-
-    if (pendingError) {
-      console.error("Erro ao buscar pendências:", pendingError.message);
-    }
+    if (pendingError) console.error("Erro ao buscar pendências:", pendingError.message);
 
     const { data: criancas } = await supabase
       .from("profiles")
@@ -55,42 +57,79 @@ export default async function Dashboard({ params }: { params: { profileId: strin
       .eq("family_id", familyId)
       .eq("status", "confirmado")
       .gte("data", inicioMes);
-    if (confirmadosError) {
-      console.error("Erro ao buscar tarefas confirmadas do mês:", confirmadosError.message);
-    }
+    if (confirmadosError) console.error("Erro ao buscar tarefas confirmadas do mês:", confirmadosError.message);
 
     const { data: ajustesMes, error: ajustesError } = await supabase
       .from("saldo_ajustes")
       .select("profile_id, valor")
       .eq("family_id", familyId)
       .gte("criado_em", `${inicioMes}T00:00:00`);
-    if (ajustesError) {
-      console.error("Erro ao buscar ajustes de saldo:", ajustesError.message);
-    }
+    if (ajustesError) console.error("Erro ao buscar ajustes de saldo:", ajustesError.message);
 
-    const saldoPorPerfil = new Map<string, number>();
+    const saldoPorPerfil: Record<string, number> = {};
     for (const e of confirmadosMes ?? []) {
-      saldoPorPerfil.set(e.profile_id, (saldoPorPerfil.get(e.profile_id) ?? 0) + Number(e.valor));
+      saldoPorPerfil[e.profile_id] = (saldoPorPerfil[e.profile_id] ?? 0) + Number(e.valor);
     }
     for (const a of ajustesMes ?? []) {
-      saldoPorPerfil.set(a.profile_id, (saldoPorPerfil.get(a.profile_id) ?? 0) + Number(a.valor));
+      saldoPorPerfil[a.profile_id] = (saldoPorPerfil[a.profile_id] ?? 0) + Number(a.valor);
     }
+
+    const { data: catalogoFamilia } = await supabase
+      .from("task_catalog")
+      .select("id, name, categoria, subcategoria, valor_unitario")
+      .eq("family_id", familyId)
+      .eq("ativo", true)
+      .order("categoria");
+
+    const { data: eventosHistorico, error: histEventosError } = await supabase
+      .from("task_events")
+      .select("id, status, valor, created_at, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
+      .eq("family_id", familyId)
+      .order("created_at", { ascending: false })
+      .limit(60);
+    if (histEventosError) console.error("Erro ao buscar histórico de eventos:", histEventosError.message);
+
+    const { data: ajustesHistorico, error: histAjustesError } = await supabase
+      .from("saldo_ajustes")
+      .select("id, valor, motivo, criado_em, profiles!saldo_ajustes_profile_id_fkey(name)")
+      .eq("family_id", familyId)
+      .order("criado_em", { ascending: false })
+      .limit(60);
+    if (histAjustesError) console.error("Erro ao buscar histórico de ajustes:", histAjustesError.message);
+
+    const atividades: AtividadeItem[] = [
+      ...(eventosHistorico ?? []).map((e) => ({
+        id: e.id,
+        quando: e.created_at,
+        quemNome: (e.profiles as unknown as { name: string } | null)?.name,
+        descricao: (e.task_catalog as unknown as { name: string } | null)?.name ?? "Tarefa",
+        valor: Number(e.valor),
+        statusLabel: STATUS_LABEL[e.status] ?? e.status,
+        tipo: "tarefa" as const,
+      })),
+      ...(ajustesHistorico ?? []).map((a) => ({
+        id: a.id,
+        quando: a.criado_em,
+        quemNome: (a.profiles as unknown as { name: string } | null)?.name,
+        descricao: a.motivo ? `Ajuste manual — ${a.motivo}` : "Ajuste manual",
+        valor: Number(a.valor),
+        statusLabel: Number(a.valor) >= 0 ? "crédito" : "débito",
+        tipo: "ajuste" as const,
+      })),
+    ]
+      .sort((a, b) => (a.quando < b.quando ? 1 : -1))
+      .slice(0, 60);
 
     return (
       <Shell title={`Olá, ${profile.name}`} onLogout={logout} onTrocarPerfil={trocarPerfil}>
-        <h2 className="text-lg font-semibold mb-3">Saldo do mês</h2>
-        {(criancas ?? []).map((crianca) => (
-          <SaldoCard
-            key={crianca.id}
-            profileId={crianca.id}
-            familyId={familyId}
-            name={crianca.name}
-            saldo={saldoPorPerfil.get(crianca.id) ?? 0}
-          />
-        ))}
-
-        <h2 className="text-lg font-semibold mb-3 mt-6">Pendências</h2>
-        <ConfirmQueue familyId={familyId} events={(pending ?? []) as unknown as PendingEvent[]} />
+        <ResponsavelDashboard
+          familyId={familyId}
+          criancas={criancas ?? []}
+          saldoPorPerfil={saldoPorPerfil}
+          pending={(pending ?? []) as unknown as PendingEvent[]}
+          catalog={catalogoFamilia ?? []}
+          atividades={atividades}
+        />
       </Shell>
     );
   }
@@ -98,80 +137,73 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   // Perfil criança
   const { data: catalog } = await supabase
     .from("task_catalog")
-    .select("id, name, categoria, valor_unitario")
+    .select("id, name, categoria, subcategoria, frequencia, valor_unitario")
     .eq("family_id", familyId)
     .eq("ativo", true)
     .order("categoria");
 
-  const { data: meusEventosHoje } = await supabase
+  const { data: eventosMes, error: eventosMesError } = await supabase
     .from("task_events")
-    .select("task_id, status, id")
+    .select("id, task_id, status, valor, data")
     .eq("profile_id", profile.id)
-    .eq("data", today);
+    .gte("data", inicioMes)
+    .order("data", { ascending: true });
+  if (eventosMesError) console.error("Erro ao buscar eventos do mês:", eventosMesError.message);
 
-  const statusPorTarefa = new Map((meusEventosHoje ?? []).map((e) => [e.task_id, e]));
+  const eventos = eventosMes ?? [];
+  const saldoDoMes = eventos.filter((e) => e.status === "confirmado").reduce((acc, e) => acc + Number(e.valor), 0);
+  const feitasMes = eventos.filter((e) => e.status === "confirmado").length;
+  const naoFeitasMes = eventos.filter((e) => e.status === "nao_feito").length;
 
-  const { data: mesEventos } = await supabase
+  const { data: eventosHistoricoProprio, error: histProprioError } = await supabase
     .from("task_events")
-    .select("valor, status")
+    .select("id, status, valor, created_at, task_catalog(name)")
     .eq("profile_id", profile.id)
-    .eq("status", "confirmado")
-    .gte("data", today.slice(0, 8) + "01");
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (histProprioError) console.error("Erro ao buscar histórico próprio:", histProprioError.message);
 
-  const saldoDoMes = (mesEventos ?? []).reduce((acc, e) => acc + Number(e.valor), 0);
+  const { data: ajustesProprios, error: ajustesProprioError } = await supabase
+    .from("saldo_ajustes")
+    .select("id, valor, motivo, criado_em")
+    .eq("profile_id", profile.id)
+    .order("criado_em", { ascending: false })
+    .limit(40);
+  if (ajustesProprioError) console.error("Erro ao buscar ajustes próprios:", ajustesProprioError.message);
 
-  const categorias = ["individual", "individual_coletiva", "coletiva"] as const;
+  const atividades: AtividadeItem[] = [
+    ...(eventosHistoricoProprio ?? []).map((e) => ({
+      id: e.id,
+      quando: e.created_at,
+      descricao: (e.task_catalog as unknown as { name: string } | null)?.name ?? "Tarefa",
+      valor: Number(e.valor),
+      statusLabel: STATUS_LABEL[e.status] ?? e.status,
+      tipo: "tarefa" as const,
+    })),
+    ...(ajustesProprios ?? []).map((a) => ({
+      id: a.id,
+      quando: a.criado_em,
+      descricao: a.motivo ? `Ajuste manual — ${a.motivo}` : "Ajuste manual",
+      valor: Number(a.valor),
+      statusLabel: Number(a.valor) >= 0 ? "crédito" : "débito",
+      tipo: "ajuste" as const,
+    })),
+  ]
+    .sort((a, b) => (a.quando < b.quando ? 1 : -1))
+    .slice(0, 40);
 
   return (
     <Shell title={`Oi, ${profile.name}!`} onLogout={logout} onTrocarPerfil={trocarPerfil}>
-      <div className="card mb-6">
-        <p className="text-slate-400 text-sm">Saldo confirmado este mês</p>
-        <p className="text-3xl font-bold text-casa-accent">R$ {saldoDoMes.toFixed(2)}</p>
-      </div>
-
-      {categorias.map((cat) => {
-        const tarefas = (catalog ?? []).filter((t) => t.categoria === cat);
-        if (tarefas.length === 0) return null;
-        return (
-          <section key={cat} className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">{CATEGORIA_LABEL[cat]}</h2>
-            <ul className="space-y-2">
-              {tarefas.map((t) => {
-                const evento = statusPorTarefa.get(t.id);
-                return (
-                  <li key={t.id} className="card flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{t.name}</p>
-                      <p className="text-sm text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
-                    </div>
-                    {!evento && cat !== "coletiva" && (
-                      <form action={markOrRequest.bind(null, t.id, familyId)}>
-                        <button className="btn-primary text-sm">Feito</button>
-                      </form>
-                    )}
-                    {!evento && cat === "coletiva" && (
-                      <form action={markOrRequest.bind(null, t.id, familyId)}>
-                        <button className="btn-secondary text-sm">Quero fazer</button>
-                      </form>
-                    )}
-                    {evento?.status === "liberada" && (
-                      <form action={markColetivaDone.bind(null, evento.id)}>
-                        <button className="btn-primary text-sm">Feito</button>
-                      </form>
-                    )}
-                    {evento && ["aguardando_confirmacao", "aguardando_autorizacao"].includes(evento.status) && (
-                      <span className="text-sm text-amber-400">
-                        {evento.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
-                      </span>
-                    )}
-                    {evento?.status === "confirmado" && <span className="text-sm text-green-400">confirmado ✓</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        );
-      })}
+      <CriancaDashboard
+        familyId={familyId}
+        today={today}
+        catalog={catalog ?? []}
+        eventosMes={eventos}
+        atividades={atividades}
+        saldoDoMes={saldoDoMes}
+        feitasMes={feitasMes}
+        naoFeitasMes={naoFeitasMes}
+      />
     </Shell>
   );
 }

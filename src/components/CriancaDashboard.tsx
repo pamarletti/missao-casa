@@ -1,0 +1,222 @@
+"use client";
+
+import { useState } from "react";
+import { markOrRequest, markColetivaDone, cancelarPropriaMarcacao } from "@/app/app/[profileId]/actions";
+import { inicioDaJanela } from "@/lib/periodos";
+import TabBar from "@/components/TabBar";
+import Atividades, { type AtividadeItem } from "@/components/Atividades";
+
+type Tarefa = {
+  id: string;
+  name: string;
+  categoria: "individual" | "individual_coletiva" | "coletiva";
+  subcategoria: string | null;
+  frequencia: string;
+  valor_unitario: number;
+};
+
+type EventoMes = {
+  id: string;
+  task_id: string;
+  status: string;
+  valor: number;
+  data: string;
+};
+
+const CATEGORIA_LABEL: Record<string, string> = {
+  individual: "Suas tarefas",
+  individual_coletiva: "Do seu espaço (quarto)",
+  coletiva: "Tarefas coletivas (bônus)",
+};
+
+const TABS = [
+  { key: "inicio", label: "Início" },
+  { key: "hoje", label: "Hoje" },
+  { key: "semana", label: "Esta semana" },
+  { key: "coletivas", label: "Coletivas" },
+  { key: "catalogo", label: "Catálogo" },
+  { key: "atividades", label: "Atividades" },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+export default function CriancaDashboard({
+  familyId,
+  today,
+  catalog,
+  eventosMes,
+  atividades,
+  saldoDoMes,
+  feitasMes,
+  naoFeitasMes,
+}: {
+  familyId: string;
+  today: string;
+  catalog: Tarefa[];
+  eventosMes: EventoMes[];
+  atividades: AtividadeItem[];
+  saldoDoMes: number;
+  feitasMes: number;
+  naoFeitasMes: number;
+}) {
+  const [tab, setTab] = useState<TabKey>("inicio");
+
+  function statusAtual(taskId: string, frequencia: string) {
+    const janela = inicioDaJanela(frequencia, today);
+    const relevantes = eventosMes.filter((e) => e.task_id === taskId && e.data >= janela);
+    return relevantes[relevantes.length - 1];
+  }
+
+  function TarefaRow({ t }: { t: Tarefa }) {
+    const evento = statusAtual(t.id, t.frequencia);
+    return (
+      <li className="card flex items-center justify-between gap-3">
+        <div>
+          <p className="font-medium">{t.name}</p>
+          <p className="text-sm text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!evento && t.categoria !== "coletiva" && (
+            <form action={markOrRequest.bind(null, t.id, familyId)}>
+              <button className="btn-primary text-sm">Feito</button>
+            </form>
+          )}
+          {!evento && t.categoria === "coletiva" && (
+            <form action={markOrRequest.bind(null, t.id, familyId)}>
+              <button className="btn-secondary text-sm">Quero fazer</button>
+            </form>
+          )}
+          {evento?.status === "liberada" && (
+            <form action={markColetivaDone.bind(null, evento.id)}>
+              <button className="btn-primary text-sm">Feito</button>
+            </form>
+          )}
+          {evento && ["aguardando_confirmacao", "aguardando_autorizacao"].includes(evento.status) && (
+            <>
+              <span className="text-sm text-amber-400">
+                {evento.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
+              </span>
+              <button
+                type="button"
+                className="text-xs text-slate-500 underline"
+                onClick={() => cancelarPropriaMarcacao(evento.id)}
+              >
+                cancelar
+              </button>
+            </>
+          )}
+          {evento?.status === "confirmado" && <span className="text-sm text-green-400">confirmado ✓</span>}
+          {evento?.status === "nao_feito" && <span className="text-sm text-red-400">não feito</span>}
+          {evento?.status === "pedido_para_refazer" && (
+            <span className="text-sm text-amber-400">pedido para refazer</span>
+          )}
+        </div>
+      </li>
+    );
+  }
+
+  function Catalogo({ tarefas, agruparPor }: { tarefas: Tarefa[]; agruparPor: "categoria" | "subcategoria" }) {
+    if (tarefas.length === 0) return <p className="text-slate-400 text-sm">Nada por aqui.</p>;
+
+    const grupos = new Map<string, Tarefa[]>();
+    for (const t of tarefas) {
+      const chave = agruparPor === "subcategoria" ? t.subcategoria ?? "Outras" : CATEGORIA_LABEL[t.categoria] ?? t.categoria;
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave)!.push(t);
+    }
+
+    return (
+      <>
+        {Array.from(grupos.entries()).map(([titulo, tarefasDoGrupo]) => (
+          <section key={titulo} className="mb-6">
+            <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+            <ul className="space-y-2">
+              {tarefasDoGrupo.map((t) => (
+                <TarefaRow key={t.id} t={t} />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </>
+    );
+  }
+
+  const pendentesProprios = eventosMes.filter((e) =>
+    ["aguardando_autorizacao", "aguardando_confirmacao"].includes(e.status)
+  );
+
+  return (
+    <div>
+      <TabBar tabs={TABS} active={tab} onChange={setTab} />
+
+      {tab === "inicio" && (
+        <>
+          <div className="card mb-4">
+            <p className="text-slate-400 text-sm">Saldo confirmado este mês</p>
+            <p className="text-3xl font-bold text-casa-accent">R$ {saldoDoMes.toFixed(2)}</p>
+          </div>
+          <div className="card mb-6 flex justify-around text-center">
+            <div>
+              <p className="text-2xl font-bold text-green-400">{feitasMes}</p>
+              <p className="text-xs text-slate-400">feitas no mês</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-400">{naoFeitasMes}</p>
+              <p className="text-xs text-slate-400">não feitas no mês</p>
+            </div>
+          </div>
+
+          {pendentesProprios.length > 0 && (
+            <section className="mb-6">
+              <h2 className="text-lg font-semibold mb-3">Esperando decisão</h2>
+              <ul className="space-y-2">
+                {pendentesProprios.map((e) => {
+                  const tarefa = catalog.find((t) => t.id === e.task_id);
+                  return (
+                    <li key={e.id} className="card flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
+                        <p className="text-sm text-amber-400">
+                          {e.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-500 underline shrink-0"
+                        onClick={() => cancelarPropriaMarcacao(e.id)}
+                      >
+                        cancelar
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+
+      {tab === "hoje" && (
+        <Catalogo
+          tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "diaria")}
+          agruparPor="categoria"
+        />
+      )}
+
+      {tab === "semana" && (
+        <Catalogo
+          tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "semanal")}
+          agruparPor="categoria"
+        />
+      )}
+
+      {tab === "coletivas" && (
+        <Catalogo tarefas={catalog.filter((t) => t.categoria === "coletiva")} agruparPor="subcategoria" />
+      )}
+
+      {tab === "catalogo" && <Catalogo tarefas={catalog} agruparPor="categoria" />}
+
+      {tab === "atividades" && <Atividades itens={atividades} permitirDesfazer={false} />}
+    </div>
+  );
+}

@@ -137,7 +137,7 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   // Perfil criança
   const { data: catalog } = await supabase
     .from("task_catalog")
-    .select("id, name, categoria, subcategoria, frequencia, valor_unitario")
+    .select("id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia")
     .eq("family_id", familyId)
     .eq("ativo", true)
     .order("categoria");

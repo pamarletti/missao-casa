@@ -13,6 +13,7 @@ type Tarefa = {
   subcategoria: string | null;
   frequencia: string;
   valor_unitario: number;
+  ocorrencias_por_dia: number;
 };
 
 type EventoMes = {
@@ -145,6 +146,30 @@ export default function CriancaDashboard({
     ["aguardando_autorizacao", "aguardando_confirmacao"].includes(e.status)
   );
 
+  // Progresso e projeção: quanto dá pra ganhar fazendo tudo que é
+  // obrigatório (individual + individual-coletiva — as coletivas são
+  // bônus à parte, sem obrigação nem teto).
+  const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
+  const potencialDia = obrigatorias
+    .filter((t) => t.frequencia === "diaria")
+    .reduce((acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1), 0);
+  const potencialSemanaTarefas = obrigatorias
+    .filter((t) => t.frequencia === "semanal")
+    .reduce((acc, t) => acc + Number(t.valor_unitario), 0);
+  const potencialSemana = potencialDia * 7 + potencialSemanaTarefas;
+  const potencialMes = potencialDia * 30 + potencialSemanaTarefas * 4;
+
+  const idsObrigatorias = new Set(obrigatorias.map((t) => t.id));
+  const feitoHoje = eventosMes
+    .filter(
+      (e) =>
+        e.data === today &&
+        idsObrigatorias.has(e.task_id) &&
+        ["confirmado", "aguardando_confirmacao"].includes(e.status)
+    )
+    .reduce((acc, e) => acc + Number(e.valor), 0);
+  const progressoPct = potencialDia > 0 ? Math.min(100, (feitoHoje / potencialDia) * 100) : 0;
+
   return (
     <div>
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
@@ -155,6 +180,40 @@ export default function CriancaDashboard({
             <p className="text-slate-400 text-sm">Saldo confirmado este mês</p>
             <p className="text-3xl font-bold text-casa-accent">R$ {saldoDoMes.toFixed(2)}</p>
           </div>
+
+          <div className="card mb-4">
+            <div className="flex justify-between text-sm text-slate-400 mb-1">
+              <span>Progresso de hoje</span>
+              <span>
+                R$ {feitoHoje.toFixed(2)} / R$ {potencialDia.toFixed(2)}
+              </span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+              <div
+                className="bg-casa-accent h-3 rounded-full transition-all"
+                style={{ width: `${progressoPct}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="card mb-6">
+            <p className="text-sm text-slate-400 mb-2">Se fizer tudo que é obrigatório, dá pra chegar a:</p>
+            <div className="flex justify-around text-center">
+              <div>
+                <p className="font-bold text-casa-accent">R$ {potencialDia.toFixed(2)}</p>
+                <p className="text-xs text-slate-400">hoje</p>
+              </div>
+              <div>
+                <p className="font-bold text-casa-accent">R$ {potencialSemana.toFixed(2)}</p>
+                <p className="text-xs text-slate-400">essa semana</p>
+              </div>
+              <div>
+                <p className="font-bold text-casa-accent">R$ {potencialMes.toFixed(2)}</p>
+                <p className="text-xs text-slate-400">esse mês</p>
+              </div>
+            </div>
+          </div>
+
           <div className="card mb-6 flex justify-around text-center">
             <div>
               <p className="text-2xl font-bold text-green-400">{feitasMes}</p>

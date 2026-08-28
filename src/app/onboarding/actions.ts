@@ -15,14 +15,30 @@ export async function completeOnboarding(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: family, error: familyError } = await supabase
+  let { data: family } = await supabase
     .from("families")
     .select("id")
     .eq("owner_user_id", user!.id)
-    .single();
+    .maybeSingle();
 
-  if (familyError || !family) {
-    redirect(`/onboarding?erro=${encodeURIComponent("Não encontrei a família. Tente entrar de novo.")}`);
+  // Se a família ainda não existe (ex.: confirmação de e-mail estava ligada
+  // no momento do cadastro, então não havia sessão para criá-la ali), cria
+  // agora — o usuário já está autenticado nesse ponto.
+  if (!family) {
+    const { data: novaFamilia, error: criarFamiliaError } = await supabase
+      .from("families")
+      .insert({ owner_user_id: user!.id, name: "Minha família" })
+      .select("id")
+      .single();
+
+    if (criarFamiliaError || !novaFamilia) {
+      redirect(
+        `/onboarding?erro=${encodeURIComponent(
+          "Não consegui criar a família: " + (criarFamiliaError?.message ?? "erro desconhecido")
+        )}`
+      );
+    }
+    family = novaFamilia;
   }
 
   const profiles: {

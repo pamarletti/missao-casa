@@ -1,10 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { markOrRequest, markColetivaDone, cancelarPropriaMarcacao } from "@/app/app/[profileId]/actions";
 import { inicioDaJanela } from "@/lib/periodos";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
+
+// Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
+// rotina de desconto automático em src/app/api/cron/desconto/route.ts).
+const OFFSET_RECIFE_MS = 3 * 60 * 60 * 1000;
+
+function somaDiasISO(dataISO: string, dias: number): string {
+  const d = new Date(dataISO + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatTempoRestante(ms: number): string {
+  if (ms <= 0) return "encerrando...";
+  const totalMinutos = Math.floor(ms / 60000);
+  const dias = Math.floor(totalMinutos / (60 * 24));
+  const horas = Math.floor((totalMinutos % (60 * 24)) / 60);
+  const minutos = totalMinutos % 60;
+  if (dias > 0) return `${dias}d ${horas}h ${minutos}min`;
+  if (horas > 0) return `${horas}h ${minutos}min`;
+  return `${minutos}min`;
+}
 
 type Tarefa = {
   id: string;
@@ -63,6 +84,14 @@ export default function CriancaDashboard({
   numCriancas: number;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
+
+  // Relógio ao vivo (atualiza a cada 30s) pra contagem regressiva do fim do
+  // dia e do fim da semana funcionar sozinha na tela, sem precisar recarregar.
+  const [agora, setAgora] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setAgora(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   function statusAtual(taskId: string, frequencia: string) {
     const janela = inicioDaJanela(frequencia, today);
@@ -206,6 +235,39 @@ export default function CriancaDashboard({
   const bonusExtraSemana = (coletivasDia * 7 + coletivasSemana) / divisorCriancas;
   const bonusExtraMes = coletivasTotalMes / divisorCriancas;
 
+  // Contagem regressiva pro fim do dia e pro fim da semana (segunda a
+  // domingo), calculada a partir do horário real de Recife — igual à
+  // rotina de desconto automático — e não do fuso do aparelho de quem
+  // está usando o app.
+  const agoraRecifeMs = agora.getTime() - OFFSET_RECIFE_MS;
+  const hojeRecife = new Date(agoraRecifeMs).toISOString().slice(0, 10);
+  const diaDaSemanaRecife = new Date(agoraRecifeMs).getUTCDay(); // 0 = domingo, 1 = segunda
+
+  const amanhaRecife = somaDiasISO(hojeRecife, 1);
+  const msAteFimDoDia = new Date(amanhaRecife + "T03:00:00Z").getTime() - agora.getTime();
+
+  let diasAteFimDaSemana = (1 - diaDaSemanaRecife + 7) % 7;
+  if (diasAteFimDaSemana === 0) diasAteFimDaSemana = 7;
+  const proximaSegundaRecife = somaDiasISO(hojeRecife, diasAteFimDaSemana);
+  const msAteFimDaSemana = new Date(proximaSegundaRecife + "T03:00:00Z").getTime() - agora.getTime();
+
+  // Quanto vai ser descontado se as obrigatórias de hoje/desta semana
+  // continuarem sem nenhuma marcação até o prazo — mesma regra de
+  // "silêncio total" da rotina automática (qualquer marcação já feita,
+  // mesmo "não feito", tira a tarefa dessa lista).
+  const diariasEmRisco = obrigatorias.filter(
+    (t) => t.frequencia === "diaria" && !statusAtual(t.id, t.frequencia)
+  );
+  const valorEmRiscoHoje = diariasEmRisco.reduce(
+    (acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1),
+    0
+  );
+
+  const semanaisEmRisco = obrigatorias.filter(
+    (t) => t.frequencia === "semanal" && !statusAtual(t.id, t.frequencia)
+  );
+  const valorEmRiscoSemana = semanaisEmRisco.reduce((acc, t) => acc + Number(t.valor_unitario), 0);
+
   return (
     <div>
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
@@ -255,6 +317,44 @@ export default function CriancaDashboard({
             </div>
           </div>
 
+          <div className="card mb-4">
+            <p className="text-sm text-slate-400 mb-3">⏰ Tempo restante</p>
+
+            <div className="flex justify-between items-center gap-3">
+              <div>
+                <p className="font-medium">Hoje</p>
+                <p className="text-xs text-slate-400">{formatTempoRestante(msAteFimDoDia)} até meia-noite</p>
+              </div>
+              {valorEmRiscoHoje > 0 ? (
+                <p className="text-sm font-bold text-red-400 text-right shrink-0">
+                  -R$ {valorEmRiscoHoje.toFixed(2)}
+                </p>
+              ) : (
+                <p className="text-sm text-green-400 text-right shrink-0">tudo em dia ✓</p>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center gap-3 mt-3 pt-3 border-t border-slate-700">
+              <div>
+                <p className="font-medium">Esta semana</p>
+                <p className="text-xs text-slate-400">{formatTempoRestante(msAteFimDaSemana)} até o fim</p>
+              </div>
+              {valorEmRiscoSemana > 0 ? (
+                <p className="text-sm font-bold text-red-400 text-right shrink-0">
+                  -R$ {valorEmRiscoSemana.toFixed(2)}
+                </p>
+              ) : (
+                <p className="text-sm text-green-400 text-right shrink-0">tudo em dia ✓</p>
+              )}
+            </div>
+
+            {(valorEmRiscoHoje > 0 || valorEmRiscoSemana > 0) && (
+              <p className="text-xs text-slate-500 mt-3">
+                É o quanto você deixa de ganhar se essas tarefas obrigatórias continuarem sem marcar até o prazo.
+              </p>
+            )}
+          </div>
+
           <div className="card mb-6">
             <p className="text-sm text-slate-400 mb-2">Se fizer tudo que é obrigatório, dá pra chegar a:</p>
             <div className="flex justify-around text-center">
@@ -275,7 +375,7 @@ export default function CriancaDashboard({
 
           <div className="card mb-6">
             <p className="text-sm text-slate-400 mb-2">
-              Bônus extra fazendo tarefas coletivas (média por criança, sem teto):
+              Bônus extra fazendo tarefas coletivas - não tem limite:
             </p>
             <div className="flex justify-around text-center">
               <div>

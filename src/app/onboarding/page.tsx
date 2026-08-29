@@ -1,4 +1,5 @@
 import { completeOnboarding } from "./actions";
+import OnboardingForm from "./OnboardingForm";
 
 export default function OnboardingPage({
   searchParams,
@@ -19,7 +20,7 @@ export default function OnboardingPage({
 
         {searchParams.erro && <p className="text-red-400 text-sm">{searchParams.erro}</p>}
 
-        <form action={completeOnboarding} className="space-y-6">
+        <OnboardingForm action={completeOnboarding}>
           <fieldset className="space-y-3">
             <legend className="font-semibold text-casa-accent">Responsáveis</legend>
             {[1, 2].map((n) => (
@@ -44,11 +45,7 @@ export default function OnboardingPage({
               <input key={n} name={`crianca${n}_nome`} placeholder={`Nome da criança ${n}`} required={n === 1} />
             ))}
           </fieldset>
-
-          <button type="submit" className="btn-primary w-full">
-            Começar a usar
-          </button>
-        </form>
+        </OnboardingForm>
       </div>
     </main>
   );

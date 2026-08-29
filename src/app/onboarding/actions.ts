@@ -41,6 +41,21 @@ export async function completeOnboarding(formData: FormData) {
     family = novaFamilia;
   }
 
+  // Trava contra cadastro duplicado: se a família já tem algum perfil, o
+  // cadastro já foi concluído antes (ex.: clique duplo em "Começar a usar",
+  // ou reenvio depois de voltar a página) — não cria os perfis de novo, só
+  // manda direto pro app. Existia um bug em que isso não era checado e cada
+  // envio extra criava um conjunto duplicado de perfis (mesmos nomes,
+  // saldo zerado) na mesma família.
+  const { count: perfisExistentes } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", family!.id);
+
+  if ((perfisExistentes ?? 0) > 0) {
+    redirect("/app");
+  }
+
   const profiles: {
     family_id: string;
     name: string;

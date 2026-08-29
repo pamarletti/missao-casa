@@ -27,6 +27,79 @@ function formatTempoRestante(ms: number): string {
   return `${minutos}min`;
 }
 
+// Ícone (em vez de foto de verdade — mais leve e não depende de upload de
+// imagem) que representa cada tarefa, escolhido por palavras-chave no nome.
+// A ordem importa: frases mais específicas vêm antes das genéricas.
+const ICONES_POR_PALAVRA: [string, string][] = [
+  ["roupa de cama", "🛏️"],
+  ["cama", "🛏️"],
+  ["mochila", "🎒"],
+  ["sapato", "👟"],
+  ["toalha", "🧺"],
+  ["louça", "🍽️"],
+  ["prato", "🍽️"],
+  ["panela", "🍳"],
+  ["utensílio", "🍳"],
+  ["lixeira", "🗑️"],
+  ["lixo", "🗑️"],
+  ["reciclagem", "♻️"],
+  ["vaso sanitário", "🚽"],
+  ["box", "🚿"],
+  ["chuveiro", "🚿"],
+  ["banheiro", "🚽"],
+  ["pia", "🚰"],
+  ["geladeira", "🧊"],
+  ["fogão", "🍳"],
+  ["micro-ondas", "🍳"],
+  ["espelho", "🪞"],
+  ["janela", "🪟"],
+  ["interruptor", "💡"],
+  ["maçaneta", "🚪"],
+  ["pó dos móveis", "🧹"],
+  ["chão", "🧹"],
+  ["varrer", "🧹"],
+  ["mesa", "🍽️"],
+  ["café da manhã", "🍳"],
+  ["almoço", "🍲"],
+  ["jantar", "🍛"],
+  ["lanche", "🥪"],
+  ["cardápio", "📋"],
+  ["compras", "🛒"],
+  ["mercado", "🛒"],
+  ["feira", "🛒"],
+  ["despensa", "🗄️"],
+  ["armário", "🗄️"],
+  ["planta", "🪴"],
+  ["regar", "🪴"],
+  ["podar", "🪴"],
+  ["skate", "🛹"],
+  ["arejar", "🌬️"],
+  ["quarto", "🛏️"],
+  ["brinquedo", "🧸"],
+  ["estante", "📚"],
+  ["rack", "📺"],
+  ["remédio", "💊"],
+  ["primeiros socorros", "💊"],
+  ["ferramenta", "🧰"],
+  ["sala", "🛋️"],
+  ["área de serviço", "🧺"],
+  ["sabonete", "🧴"],
+  ["shampoo", "🧴"],
+  ["papel higiênico", "🧻"],
+  ["roupa", "👕"],
+  ["objeto", "📦"],
+];
+
+function iconeTarefa(t: { name: string; categoria: string }): string {
+  const chave = t.name.toLowerCase();
+  for (const [palavra, icone] of ICONES_POR_PALAVRA) {
+    if (chave.includes(palavra)) return icone;
+  }
+  if (t.categoria === "coletiva") return "🤝";
+  if (t.categoria === "individual_coletiva") return "🛏️";
+  return "✅";
+}
+
 type Tarefa = {
   id: string;
   name: string;
@@ -109,6 +182,7 @@ export default function CriancaDashboard({
     const evento = statusAtual(t.id, t.frequencia);
     return (
       <li className="card p-3 flex flex-col items-center text-center gap-1">
+        <span className="text-3xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
         <div className="flex flex-col items-center gap-1 mt-1 w-full">
@@ -309,8 +383,8 @@ export default function CriancaDashboard({
             </div>
           </div>
 
-          <div className="card mb-4">
-            <p className="text-sm text-slate-400 mb-3">🙌 Tem um tempinho?</p>
+          <section className="mb-6">
+            <h2 className="text-lg font-semibold mb-3">🙌 Tem um tempinho?</h2>
             {sugestoesTempinho.length > 0 ? (
               <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {sugestoesTempinho.map((t) => (
@@ -320,7 +394,7 @@ export default function CriancaDashboard({
             ) : (
               <p className="text-sm text-green-400">Você já deu conta de tudo por enquanto! 🎉</p>
             )}
-          </div>
+          </section>
 
           <div className="card mb-4">
             <p className="text-sm text-slate-400 mb-3">⏰ Tempo restante</p>

@@ -20,3 +20,12 @@ export function inicioDaJanela(frequencia: string, hojeISO: string): string {
   if (frequencia === "mensal") return inicioDoMes(hojeISO);
   return hojeISO; // diária
 }
+
+/** Data ISO de N dias atrás — usado pra janelas móveis (ex.: os últimos
+ * 30 dias, pro nível de constância), diferente de inicioDoMes/inicioDaSemana
+ * que são "desde o início do período calendário atual". */
+export function diasAtras(hojeISO: string, dias: number): string {
+  const d = new Date(hojeISO + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - dias);
+  return d.toISOString().slice(0, 10);
+}

@@ -9,7 +9,24 @@ import MudarPinButton from "@/components/MudarPinButton";
 import EmojiButton from "@/components/EmojiButton";
 import type { PendingEvent } from "@/components/ConfirmQueue";
 import type { AtividadeItem } from "@/components/Atividades";
-import { inicioDoMes, inicioDaSemana } from "@/lib/periodos";
+import { inicioDoMes, inicioDaSemana, diasAtras } from "@/lib/periodos";
+import { valorMensalTotal } from "@/lib/valorBase";
+import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
+import NivelBadge from "@/components/NivelBadge";
+import type { Atrasada } from "@/components/PendenciasTab";
+
+// Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica usada
+// no antigo cron de desconto automático, agora substituído por decisão
+// manual — ver "Atrasadas" mais abaixo).
+function somaDiasISO(dataISO: string, dias: number): string {
+  const d = new Date(dataISO + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+function diaDaSemanaISO(dataISO: string): number {
+  return new Date(dataISO + "T00:00:00Z").getUTCDay(); // 0 = domingo, 1 = segunda
+}
 
 const STATUS_LABEL: Record<string, string> = {
   aguardando_autorizacao: "aguardando autorização",
@@ -55,7 +72,7 @@ export default async function Dashboard({
 
     const { data: criancas } = await supabase
       .from("profiles")
-      .select("id, name")
+      .select("id, name, created_at")
       .eq("family_id", familyId)
       .eq("kind", "crianca")
       .order("name");
@@ -92,6 +109,81 @@ export default async function Dashboard({
       .eq("family_id", familyId)
       .eq("ativo", true)
       .order("categoria");
+
+    // Nível de constância (só visual/motivacional — ver src/lib/nivelConstancia.ts):
+    // % líquido das tarefas obrigatórias (individual + individual-coletiva)
+    // cumprido por cada criança nos últimos 30 dias corridos.
+    const obrigatoriasCatalogo = (catalogoFamilia ?? []).filter(
+      (t) => t.categoria === "individual" || t.categoria === "individual_coletiva"
+    );
+    const obrigatoriasIds = obrigatoriasCatalogo.map((t) => t.id);
+    const potencial30Dias = valorMensalTotal(obrigatoriasCatalogo);
+    const inicioJanela30 = diasAtras(today, 29);
+
+    const { data: eventos30DiasRaw, error: eventos30Error } = await supabase
+      .from("task_events")
+      .select("profile_id, valor")
+      .eq("family_id", familyId)
+      .gte("data", inicioJanela30)
+      .in("status", ["confirmado", "desconto_automatico"])
+      .in("task_id", obrigatoriasIds.length > 0 ? obrigatoriasIds : ["00000000-0000-0000-0000-000000000000"]);
+    if (eventos30Error) console.error("Erro ao buscar eventos dos últimos 30 dias:", eventos30Error.message);
+
+    const ganhoLiquido30PorPerfil: Record<string, number> = {};
+    for (const e of eventos30DiasRaw ?? []) {
+      ganhoLiquido30PorPerfil[e.profile_id] = (ganhoLiquido30PorPerfil[e.profile_id] ?? 0) + Number(e.valor);
+    }
+
+    const nivelPorPerfil: Record<string, NivelInfo> = {};
+    for (const c of criancas ?? []) {
+      const diasDesdeCriacao = Math.floor(
+        (Date.now() - new Date(c.created_at).getTime()) / (24 * 60 * 60 * 1000)
+      );
+      nivelPorPerfil[c.id] = calcularNivel(ganhoLiquido30PorPerfil[c.id] ?? 0, potencial30Dias, diasDesdeCriacao);
+    }
+
+    // "Atrasadas": tarefas obrigatórias DIÁRIAS que ficaram em silêncio total
+    // em algum dia que já passou (nem o menino marcou nada, nem o
+    // responsável decidiu nada) — substitui o desconto automático por
+    // silêncio, que não estava rodando de forma confiável no plano
+    // gratuito da Vercel. Agora é sempre uma decisão manual do responsável,
+    // dia a dia, tarefa a tarefa (ver registrarAtrasada em actions.ts).
+    // Olha só os últimos 14 dias (e nunca antes da criação do perfil do
+    // menino) pra não acumular uma lista enorme de coisas muito antigas.
+    const diariasObrigatorias = obrigatoriasCatalogo.filter((t) => t.frequencia === "diaria");
+    const inicioJanelaAtrasadas = diasAtras(today, 13);
+
+    const { data: eventosDiariosRaw, error: eventosDiariosError } = await supabase
+      .from("task_events")
+      .select("profile_id, task_id, data")
+      .eq("family_id", familyId)
+      .gte("data", inicioJanelaAtrasadas)
+      .lt("data", today)
+      .in(
+        "task_id",
+        diariasObrigatorias.length > 0 ? diariasObrigatorias.map((t) => t.id) : ["00000000-0000-0000-0000-000000000000"]
+      );
+    if (eventosDiariosError) console.error("Erro ao buscar eventos diários recentes:", eventosDiariosError.message);
+
+    const jaTemRegistroDiario = new Set(
+      (eventosDiariosRaw ?? []).map((e) => `${e.profile_id}|${e.task_id}|${e.data}`)
+    );
+
+    const atrasadas: Atrasada[] = [];
+    for (const crianca of criancas ?? []) {
+      const criacaoISO = new Date(crianca.created_at).toISOString().slice(0, 10);
+      const inicioParaEssaCrianca = criacaoISO > inicioJanelaAtrasadas ? criacaoISO : inicioJanelaAtrasadas;
+      for (let dia = inicioParaEssaCrianca; dia < today; dia = somaDiasISO(dia, 1)) {
+        const diaDaSemana = diaDaSemanaISO(dia);
+        const eraSextaOuSabado = diaDaSemana === 5 || diaDaSemana === 6;
+        for (const tarefa of diariasObrigatorias) {
+          if (tarefa.pula_fim_de_semana && eraSextaOuSabado) continue;
+          if (jaTemRegistroDiario.has(`${crianca.id}|${tarefa.id}|${dia}`)) continue;
+          atrasadas.push({ data: dia, taskId: tarefa.id, profileId: crianca.id });
+        }
+      }
+    }
+    atrasadas.sort((a, b) => (a.data < b.data ? 1 : -1));
 
     const { data: eventosHistorico, error: histEventosError } = await supabase
       .from("task_events")
@@ -241,11 +333,13 @@ export default async function Dashboard({
           atividades={atividades}
           hojeISO={today}
           eventosSemanaTodos={eventosSemanaTodos ?? []}
+          atrasadas={atrasadas}
           descontosEventos={descontosEventos}
           descontosAjustes={descontosAjustes}
           revisarEventos={revisarEventos}
           revisarCount={revisarCount}
           valorBaseObrigatorias={valorBaseObrigatorias}
+          nivelPorPerfil={nivelPorPerfil}
         />
       </Shell>
     );
@@ -258,6 +352,30 @@ export default async function Dashboard({
     .eq("family_id", familyId)
     .eq("ativo", true)
     .order("categoria");
+
+  // Nível de constância (só visual/motivacional) — mesma lógica do lado
+  // do responsável, calculada aqui pro próprio perfil da criança.
+  const obrigatoriasCatalogo = (catalog ?? []).filter(
+    (t) => t.categoria === "individual" || t.categoria === "individual_coletiva"
+  );
+  const obrigatoriasIds = obrigatoriasCatalogo.map((t) => t.id);
+  const potencial30Dias = valorMensalTotal(obrigatoriasCatalogo);
+  const inicioJanela30 = diasAtras(today, 29);
+
+  const { data: eventos30DiasProprioRaw, error: eventos30ProprioError } = await supabase
+    .from("task_events")
+    .select("valor")
+    .eq("profile_id", profile.id)
+    .gte("data", inicioJanela30)
+    .in("status", ["confirmado", "desconto_automatico"])
+    .in("task_id", obrigatoriasIds.length > 0 ? obrigatoriasIds : ["00000000-0000-0000-0000-000000000000"]);
+  if (eventos30ProprioError) console.error("Erro ao buscar eventos dos últimos 30 dias:", eventos30ProprioError.message);
+
+  const ganhoLiquido30 = (eventos30DiasProprioRaw ?? []).reduce((acc, e) => acc + Number(e.valor), 0);
+  const diasDesdeCriacaoPerfil = Math.floor(
+    (Date.now() - new Date(profile.created_at).getTime()) / (24 * 60 * 60 * 1000)
+  );
+  const nivel = calcularNivel(ganhoLiquido30, potencial30Dias, diasDesdeCriacaoPerfil);
 
   const { data: eventosMes, error: eventosMesError } = await supabase
     .from("task_events")
@@ -359,6 +477,7 @@ export default async function Dashboard({
       onLogout={logout}
       onTrocarPerfil={trocarPerfil}
       emojiButton={<EmojiButton profileId={profile.id} iconeAtual={profile.icon} />}
+      nivelBadge={<NivelBadge info={nivel} />}
     >
       <CriancaDashboard
         nome={profile.name}
@@ -387,6 +506,7 @@ function Shell({
   pinButton,
   emojiButton,
   mensagemPin,
+  nivelBadge,
 }: {
   title: string;
   children: React.ReactNode;
@@ -395,12 +515,16 @@ function Shell({
   pinButton?: React.ReactNode;
   emojiButton?: React.ReactNode;
   mensagemPin?: { texto: string; tipo: "erro" | "sucesso" };
+  nivelBadge?: React.ReactNode;
 }) {
   return (
     <main className="min-h-screen p-4 max-w-lg sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto">
       <p className="text-center text-2xl font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
       <header className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold">{title}</h1>
+        <h1 className="text-xl font-bold flex items-center gap-2">
+          {title}
+          {nivelBadge}
+        </h1>
         <div className="flex items-center gap-2">
           {emojiButton}
           {pinButton}

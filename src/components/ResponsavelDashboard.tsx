@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import SaldoCard from "@/components/SaldoCard";
+import NivelBadge from "@/components/NivelBadge";
+import type { NivelInfo } from "@/lib/nivelConstancia";
 import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
 import TabBar from "@/components/TabBar";
 import { type AtividadeItem } from "@/components/Atividades";
-import PendenciasTab from "@/components/PendenciasTab";
+import PendenciasTab, { type Atrasada } from "@/components/PendenciasTab";
 import DescontosPorDiaTab from "@/components/DescontosPorDiaTab";
 import RevisarTarefasTab from "@/components/RevisarTarefasTab";
 import CatalogoEditavelTab from "@/components/CatalogoEditavelTab";
@@ -55,11 +57,13 @@ export default function ResponsavelDashboard({
   atividades,
   hojeISO,
   eventosSemanaTodos,
+  atrasadas,
   descontosEventos,
   descontosAjustes,
   revisarEventos,
   revisarCount,
   valorBaseObrigatorias,
+  nivelPorPerfil,
 }: {
   familyId: string;
   criancas: Crianca[];
@@ -69,11 +73,13 @@ export default function ResponsavelDashboard({
   atividades: AtividadeItem[];
   hojeISO: string;
   eventosSemanaTodos: EventoSemana[];
+  atrasadas: Atrasada[];
   descontosEventos: DescontoItem[];
   descontosAjustes: DescontoItem[];
   revisarEventos: RevisarItem[];
   revisarCount: number;
   valorBaseObrigatorias: number;
+  nivelPorPerfil: Record<string, NivelInfo>;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
 
@@ -90,6 +96,7 @@ export default function ResponsavelDashboard({
               familyId={familyId}
               name={c.name}
               saldo={saldoPorPerfil[c.id] ?? 0}
+              nivelBadge={<NivelBadge info={nivelPorPerfil[c.id]} />}
             />
           ))}
 
@@ -105,6 +112,7 @@ export default function ResponsavelDashboard({
           catalog={catalog}
           eventos={eventosSemanaTodos}
           hojeISO={hojeISO}
+          atrasadas={atrasadas}
         />
       )}
 

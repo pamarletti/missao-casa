@@ -8,11 +8,13 @@ export default function SaldoCard({
   familyId,
   name,
   saldo,
+  nivelBadge,
 }: {
   profileId: string;
   familyId: string;
   name: string;
   saldo: number;
+  nivelBadge?: React.ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -20,7 +22,10 @@ export default function SaldoCard({
     <div className="card mb-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-slate-400 text-sm">Saldo acumulado por {name}</p>
+          <p className="text-slate-400 text-sm flex items-center gap-2">
+            Saldo acumulado por {name}
+            {nivelBadge}
+          </p>
           <p className="text-2xl font-bold text-casa-accent">R$ {saldo.toFixed(2)}</p>
         </div>
         <button className="btn-secondary text-sm shrink-0" onClick={() => setAberto((v) => !v)}>

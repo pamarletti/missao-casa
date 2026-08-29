@@ -169,6 +169,75 @@ export async function registrarDireto(
   revalidatePath(`/app/${active.profileId}`);
 }
 
+/** Um responsável decide, um a um, o que fazer com uma tarefa obrigatória
+ * diária que ficou em silêncio total num dia que já passou ("Atrasada" no
+ * painel do responsável). Substitui o desconto automático por silêncio
+ * (que rodava sozinho via Vercel Cron e não estava confiável no plano
+ * gratuito — ver supabase/007_status_desconsiderada.sql): agora é sempre
+ * uma decisão manual, tarefa por tarefa, com a data correta do dia
+ * atrasado (não a de hoje):
+ * - "feito": credita o valor normalmente, como se tivesse confirmado na
+ *   hora.
+ * - "nao_feito": desconta o valor da tarefa (multiplicado pelas ocorrências
+ *   por dia, quando houver mais de uma) — o mesmo cálculo que o desconto
+ *   automático fazia.
+ * - "desconsiderar": não credita nem desconta (ex.: dia de viagem, doença
+ *   etc.) — só tira a tarefa da lista de atrasadas. */
+export async function registrarAtrasada(
+  taskId: string,
+  profileId: string,
+  familyId: string,
+  data: string,
+  decisao: "feito" | "nao_feito" | "desconsiderar"
+) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const supabase = createClient();
+  const { data: task } = await supabase
+    .from("task_catalog")
+    .select("valor_unitario, ocorrencias_por_dia")
+    .eq("id", taskId)
+    .single();
+  if (!task) return;
+
+  if (decisao === "feito") {
+    await supabase.from("task_events").insert({
+      family_id: familyId,
+      task_id: taskId,
+      profile_id: profileId,
+      data,
+      status: "confirmado",
+      valor: task.valor_unitario,
+      origem: "responsavel",
+      confirmado_por: active.profileId,
+      confirmado_em: new Date().toISOString(),
+    });
+  } else if (decisao === "nao_feito") {
+    await supabase.from("task_events").insert({
+      family_id: familyId,
+      task_id: taskId,
+      profile_id: profileId,
+      data,
+      status: "desconto_automatico",
+      valor: -(Number(task.valor_unitario) * (task.ocorrencias_por_dia || 1)),
+      origem: "responsavel",
+    });
+  } else {
+    await supabase.from("task_events").insert({
+      family_id: familyId,
+      task_id: taskId,
+      profile_id: profileId,
+      data,
+      status: "desconsiderada",
+      valor: 0,
+      origem: "responsavel",
+    });
+  }
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
 /** Um responsável edita nome, valor ou ícone de uma tarefa do catálogo —
  * vale a partir de agora, sem alterar valores de eventos já registrados.
  * Se a tarefa editada for obrigatória (individual ou individual-coletiva),

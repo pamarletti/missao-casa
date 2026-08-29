@@ -68,7 +68,7 @@ const TABS = [
   { key: "hoje", label: "Hoje" },
   { key: "semana", label: "Esta semana" },
   { key: "coletivas", label: "Coletivas" },
-  { key: "catalogo", label: "Catálogo" },
+  { key: "catalogo", label: "Catálogo Completo" },
   { key: "atividades", label: "Histórico de Atividades" },
 ] as const;
 

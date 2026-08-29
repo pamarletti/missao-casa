@@ -1,13 +1,20 @@
--- Renomeia a subcategoria de coletivas "Roupa da casa" para "Roupas,
--- lençóis e panos" (nome mais descritivo, pedido pela Paolla) — atualiza
--- tanto as tarefas já cadastradas quanto o catálogo padrão semeado para
--- famílias novas.
+-- Pequenos ajustes de nomenclatura no catálogo, pedidos pela Paolla:
+-- 1) subcategoria de coletivas "Roupa da casa" -> "Roupas, lençóis e panos"
+--    (nome mais descritivo);
+-- 2) tarefa individual "Tirar toalhas de banho" -> "Tirar toalha de banho
+--    suja" (mais claro sobre o que a tarefa é).
+-- Atualiza tanto as tarefas já cadastradas quanto o catálogo padrão
+-- semeado para famílias novas.
 
 update public.task_catalog
 set subcategoria = 'Roupas, lençóis e panos'
 where subcategoria = 'Roupa da casa';
 
--- Recria seed_default_catalog com a subcategoria renomeada.
+update public.task_catalog
+set name = 'Tirar toalha de banho suja'
+where name = 'Tirar toalhas de banho';
+
+-- Recria seed_default_catalog com os nomes atualizados.
 create or replace function public.seed_default_catalog(p_family_id uuid)
 returns void
 language sql
@@ -29,7 +36,7 @@ as $$
     (p_family_id, 'Guardar a própria roupa limpa no lugar', 'individual', null, 'semanal', 10, 1, 0.70, 1, false),
     (p_family_id, 'Manter o próprio skate e EPIs higienizados', 'individual', null, 'semanal', 10, 2, 0.85, 1, false),
     (p_family_id, 'Lavar toalhas de banho', 'individual', null, 'semanal', 10, 2, 0.85, 1, false),
-    (p_family_id, 'Tirar toalhas de banho', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
+    (p_family_id, 'Tirar toalha de banho suja', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
     (p_family_id, 'Guardar toalhas limpas', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
     (p_family_id, 'Limpar o próprio tênis', 'individual', null, 'semanal', 10, 1, 0.70, 1, false),
 
@@ -68,7 +75,7 @@ as $$
     (p_family_id, 'Limpar micro-ondas', 'coletiva', 'Limpeza da cozinha', 'semanal', 10, 1, 0.70, 1, false),
     (p_family_id, 'Limpar a geladeira por dentro', 'coletiva', 'Limpeza da cozinha', 'semanal', 15, 2, 1.25, 1, false),
 
-    -- Coletivas: Roupa da casa
+    -- Coletivas: Roupas, lençóis e panos
     (p_family_id, 'Lavar roupas brancas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),
     (p_family_id, 'Lavar roupas coloridas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),
     (p_family_id, 'Lavar roupas escuras', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),

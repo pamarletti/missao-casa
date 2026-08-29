@@ -8,6 +8,7 @@ const ICONES_POR_PALAVRA: [string, string][] = [
   ["cama", "🛏️"],
   ["mochila", "🎒"],
   ["sapato", "👟"],
+  ["tênis", "👟"],
   ["toalha", "🧺"],
   ["louça", "🍽️"],
   ["prato", "🍽️"],
@@ -59,6 +60,7 @@ const ICONES_POR_PALAVRA: [string, string][] = [
   ["sabonete", "🧴"],
   ["shampoo", "🧴"],
   ["papel higiênico", "🧻"],
+  ["limpeza", "🧴"],
   ["roupa", "👕"],
   ["objeto", "📦"],
 ];

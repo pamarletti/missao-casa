@@ -11,8 +11,27 @@ export async function signup(formData: FormData) {
   const supabase = createClient();
 
   const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error || !data.user) {
-    redirect(`/signup?erro=${encodeURIComponent(error?.message ?? "Não deu para criar a conta")}`);
+  if (error) {
+    const mensagem = /already registered|already exists/i.test(error.message)
+      ? 'Esse e-mail já tem uma conta cadastrada. Tenta entrar, ou usa "Esqueci minha senha" se não lembrar a senha.'
+      : error.message;
+    redirect(`/signup?erro=${encodeURIComponent(mensagem)}`);
+  }
+  if (!data.user) {
+    redirect(`/signup?erro=${encodeURIComponent("Não deu para criar a conta")}`);
+  }
+
+  // Quando o e-mail já pertence a uma conta confirmada, o Supabase não
+  // devolve erro nenhum (pra não vazar pra quem tenta adivinhar e-mails
+  // cadastrados) — em vez disso, devolve um usuário "fantasma" com
+  // identities vazio. É assim que detectamos e avisamos com uma mensagem
+  // clara, em vez de deixar a pessoa achando que criou a conta.
+  if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    redirect(
+      `/signup?erro=${encodeURIComponent(
+        'Esse e-mail já tem uma conta cadastrada. Tenta entrar, ou usa "Esqueci minha senha" se não lembrar a senha.'
+      )}`
+    );
   }
 
   // Se a confirmação de e-mail estiver ligada no projeto Supabase, data.session

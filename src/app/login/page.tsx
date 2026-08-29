@@ -33,6 +33,12 @@ export default function LoginPage({
           </button>
         </form>
 
+        <p className="text-sm text-center">
+          <Link href="/forgot-password" className="text-slate-400 underline">
+            Esqueci minha senha
+          </Link>
+        </p>
+
         <p className="text-sm text-slate-400 text-center">
           Primeira vez por aqui?{" "}
           <Link href="/signup" className="text-casa-accent underline">

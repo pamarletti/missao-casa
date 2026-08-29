@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { selectChildProfile, verifyPinAndSelect } from "./actions";
+import { selectChildProfile, verifyPinAndSelect, logout } from "./actions";
 
 const ICONS: Record<string, string> = { crianca: "🧒", responsavel: "🛡️" };
 
@@ -36,6 +36,13 @@ export default async function ProfilePickerPage({
       <div className="w-full max-w-md space-y-6">
         <h1 className="text-2xl font-bold text-center">{family.name}</h1>
         <p className="text-slate-400 text-sm text-center">Quem é você?</p>
+        <div className="text-center">
+          <form action={logout}>
+            <button className="text-xs text-slate-500 underline" title="Sair e voltar para o login/cadastro">
+              sair desta conta
+            </button>
+          </form>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           {profiles.map((p) =>

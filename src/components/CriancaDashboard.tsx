@@ -131,11 +131,11 @@ export default function CriancaDashboard({
   function TarefaRow({ t }: { t: Tarefa }) {
     const evento = statusAtual(t.id, t.frequencia);
     return (
-      <li className="card p-3 flex flex-col items-center text-center gap-1">
+      <li className="card p-3 flex flex-col items-center text-center gap-1 h-full">
         <span className="text-3xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
-        <div className="flex flex-col items-center gap-1 mt-1 w-full">
+        <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
           {!evento && t.categoria !== "coletiva" && (
             <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
               <button className="btn-primary text-xs w-full">Feito</button>

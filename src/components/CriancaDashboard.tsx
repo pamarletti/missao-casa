@@ -51,7 +51,7 @@ type EventoMes = {
 
 const CATEGORIA_LABEL: Record<string, string> = {
   individual: "Suas tarefas",
-  individual_coletiva: "Do seu espaço (quarto)",
+  individual_coletiva: "Seu espaço compartilhado",
   coletiva: "Tarefas coletivas (bônus)",
 };
 

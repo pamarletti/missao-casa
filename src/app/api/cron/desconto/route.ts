@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
  * "pedido para refazer" (que já zeram o valor), não desconta de novo.
  *
  * Diárias: ao virar o dia, avalia o dia que acabou de terminar (ontem).
+ * Tarefas diárias marcadas com `pula_fim_de_semana` (ex.: "cuidar da roupa
+ * da escola", "arrumar a mochila") nunca são descontadas se o dia avaliado
+ * foi sexta ou sábado — não tem aula, não tem o que fazer, então não tem o
+ * que descontar.
  * Semanais: só às segundas-feiras (semana começa na segunda, por decisão
  * da família), avalia a semana que acabou de terminar (segunda a domingo
  * anteriores).
@@ -51,6 +55,7 @@ type Tarefa = {
   frequencia: string;
   valor_unitario: number;
   ocorrencias_por_dia: number | null;
+  pula_fim_de_semana: boolean | null;
 };
 
 type Crianca = { id: string; family_id: string };
@@ -65,12 +70,14 @@ export async function GET(request: Request) {
 
   const hoje = hojeRecife(); // dia que está começando agora
   const ontem = somaDias(hoje, -1); // dia que acabou de terminar
+  const diaOntemSemana = diaDaSemanaUTC(ontem);
+  const ontemEraSextaOuSabado = diaOntemSemana === 5 || diaOntemSemana === 6;
 
   const [{ data: criancas }, { data: tarefas }] = await Promise.all([
     supabase.from("profiles").select("id, family_id").eq("kind", "crianca") as unknown as Promise<{ data: Crianca[] | null }>,
     supabase
       .from("task_catalog")
-      .select("id, family_id, frequencia, valor_unitario, ocorrencias_por_dia")
+      .select("id, family_id, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana")
       .eq("ativo", true)
       .in("categoria", ["individual", "individual_coletiva"]) as unknown as Promise<{ data: Tarefa[] | null }>,
   ]);
@@ -96,6 +103,7 @@ export async function GET(request: Request) {
     for (const crianca of listaCriancas) {
       for (const tarefa of tarefasDiarias) {
         if (tarefa.family_id !== crianca.family_id) continue;
+        if (tarefa.pula_fim_de_semana && ontemEraSextaOuSabado) continue; // não era dia de fazer
         if (jaTemRegistro.has(`${crianca.id}|${tarefa.id}`)) continue;
         novos.push({
           family_id: tarefa.family_id,

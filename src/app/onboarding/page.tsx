@@ -26,6 +26,7 @@ export default function OnboardingPage({
               <div key={n} className="grid grid-cols-2 gap-2">
                 <input name={`responsavel${n}_nome`} placeholder={`Nome (ex.: Mãe)`} required={n === 1} />
                 <input
+                  type="password"
                   name={`responsavel${n}_pin`}
                   placeholder="PIN de 4 dígitos"
                   inputMode="numeric"

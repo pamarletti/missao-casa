@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { markOrRequest, markColetivaDone, cancelarPropriaMarcacao } from "@/app/app/[profileId]/actions";
 import { inicioDaJanela } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
+import { ocorrenciasPorMes, ocorrenciasPorSemana } from "@/lib/valorBase";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 
@@ -36,6 +37,7 @@ type Tarefa = {
   frequencia: string;
   valor_unitario: number;
   ocorrencias_por_dia: number;
+  pula_fim_de_semana: boolean;
   icone: string | null;
 };
 
@@ -51,6 +53,14 @@ const CATEGORIA_LABEL: Record<string, string> = {
   individual: "Suas tarefas",
   individual_coletiva: "Do seu espaço (quarto)",
   coletiva: "Tarefas coletivas (bônus)",
+};
+
+// Obrigatórias sempre antes das coletivas (bônus), quando o catálogo é
+// mostrado agrupado por categoria (aba "Catálogo Completo").
+const ORDEM_CATEGORIA: Record<string, number> = {
+  individual: 0,
+  individual_coletiva: 1,
+  coletiva: 2,
 };
 
 const TABS = [
@@ -102,6 +112,15 @@ export default function CriancaDashboard({
     const id = setInterval(() => setAgora(new Date()), 30000);
     return () => clearInterval(id);
   }, []);
+
+  // Horário e dia da semana reais de Recife (mesma lógica da rotina de
+  // desconto automático), usados tanto na contagem regressiva quanto para
+  // saber se hoje é sexta ou sábado — dias em que "cuidar da roupa da
+  // escola" e "arrumar a mochila" não valem (não tem aula).
+  const agoraRecifeMs = agora.getTime() - OFFSET_RECIFE_MS;
+  const hojeRecife = new Date(agoraRecifeMs).toISOString().slice(0, 10);
+  const diaDaSemanaRecife = new Date(agoraRecifeMs).getUTCDay(); // 0 = domingo, 1 = segunda
+  const ehSextaOuSabado = diaDaSemanaRecife === 5 || diaDaSemanaRecife === 6;
 
   function statusAtual(taskId: string, frequencia: string) {
     const janela = inicioDaJanela(frequencia, today);
@@ -166,9 +185,18 @@ export default function CriancaDashboard({
       grupos.get(chave)!.push(t);
     }
 
+    let entradas = Array.from(grupos.entries());
+    if (agruparPor === "categoria") {
+      const categoriaDoTitulo = (titulo: string) =>
+        Object.entries(CATEGORIA_LABEL).find(([, label]) => label === titulo)?.[0] ?? titulo;
+      entradas = entradas.sort(
+        (a, b) => (ORDEM_CATEGORIA[categoriaDoTitulo(a[0])] ?? 99) - (ORDEM_CATEGORIA[categoriaDoTitulo(b[0])] ?? 99)
+      );
+    }
+
     return (
       <>
-        {Array.from(grupos.entries()).map(([titulo, tarefasDoGrupo]) => (
+        {entradas.map(([titulo, tarefasDoGrupo]) => (
           <section key={titulo} className="mb-6">
             <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
             <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -188,38 +216,30 @@ export default function CriancaDashboard({
 
   // Progresso e projeção: quanto dá pra ganhar fazendo tudo que é
   // obrigatório (individual + individual-coletiva — as coletivas são
-  // bônus à parte, sem obrigação nem teto).
+  // bônus à parte, sem obrigação nem teto). Tarefas diárias que não valem
+  // na sexta/sábado (ex.: mochila, roupa da escola) só entram na conta de
+  // "hoje" quando hoje é um dia em que elas realmente valem.
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
-  const potencialDia = obrigatorias
+  const obrigatoriasHoje = obrigatorias.filter((t) => !(t.pula_fim_de_semana && ehSextaOuSabado));
+  const potencialDia = obrigatoriasHoje
     .filter((t) => t.frequencia === "diaria")
     .reduce((acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1), 0);
-  const potencialSemanaTarefas = obrigatorias
-    .filter((t) => t.frequencia === "semanal")
-    .reduce((acc, t) => acc + Number(t.valor_unitario), 0);
-  const potencialSemana = potencialDia * 7 + potencialSemanaTarefas;
-  const potencialMes = potencialDia * 30 + potencialSemanaTarefas * 4;
+  const potencialSemana = obrigatorias.reduce((acc, t) => acc + Number(t.valor_unitario) * ocorrenciasPorSemana(t), 0);
+  const potencialMes = obrigatorias.reduce((acc, t) => acc + Number(t.valor_unitario) * ocorrenciasPorMes(t), 0);
 
   const idsObrigatorias = new Set(obrigatorias.map((t) => t.id));
+  // Só conta no progresso do dia o que já foi confirmado pelo responsável —
+  // uma marcação ainda "aguardando confirmação" não mexe na barra.
   const feitoHoje = eventosMes
-    .filter(
-      (e) =>
-        e.data === today &&
-        idsObrigatorias.has(e.task_id) &&
-        ["confirmado", "aguardando_confirmacao"].includes(e.status)
-    )
+    .filter((e) => e.data === today && idsObrigatorias.has(e.task_id) && e.status === "confirmado")
     .reduce((acc, e) => acc + Number(e.valor), 0);
   const progressoPct = potencialDia > 0 ? Math.min(100, (feitoHoje / potencialDia) * 100) : 0;
 
-  // Progresso do mês: quanto das tarefas obrigatórias já foi feito/marcado
-  // este mês, sobre o teto do mês (R$90) — e quanto ainda falta pra chegar
-  // lá. Conta também o que está aguardando confirmação (já foi feito, só
-  // falta o responsável bater o olho), não só o que já foi confirmado.
+  // Progresso do mês: só o que já foi confirmado (mais os descontos
+  // automáticos, que tiram valor quando a tarefa fica em silêncio total) —
+  // uma marcação ainda esperando confirmação não move a barra.
   const obrigatoriasFeitasMes = eventosMes
-    .filter(
-      (e) =>
-        idsObrigatorias.has(e.task_id) &&
-        ["confirmado", "aguardando_confirmacao", "desconto_automatico"].includes(e.status)
-    )
+    .filter((e) => idsObrigatorias.has(e.task_id) && ["confirmado", "desconto_automatico"].includes(e.status))
     .reduce((acc, e) => acc + Number(e.valor), 0);
   const progressoMesPct = potencialMes > 0 ? Math.min(100, Math.max(0, (obrigatoriasFeitasMes / potencialMes) * 100)) : 0;
   const faltaMes = Math.max(0, potencialMes - obrigatoriasFeitasMes);
@@ -248,10 +268,6 @@ export default function CriancaDashboard({
   // domingo), calculada a partir do horário real de Recife — igual à
   // rotina de desconto automático — e não do fuso do aparelho de quem
   // está usando o app.
-  const agoraRecifeMs = agora.getTime() - OFFSET_RECIFE_MS;
-  const hojeRecife = new Date(agoraRecifeMs).toISOString().slice(0, 10);
-  const diaDaSemanaRecife = new Date(agoraRecifeMs).getUTCDay(); // 0 = domingo, 1 = segunda
-
   const amanhaRecife = somaDiasISO(hojeRecife, 1);
   const msAteFimDoDia = new Date(amanhaRecife + "T03:00:00Z").getTime() - agora.getTime();
 
@@ -263,8 +279,9 @@ export default function CriancaDashboard({
   // Quanto vai ser descontado se as obrigatórias de hoje/desta semana
   // continuarem sem nenhuma marcação até o prazo — mesma regra de
   // "silêncio total" da rotina automática (qualquer marcação já feita,
-  // mesmo "não feito", tira a tarefa dessa lista).
-  const diariasEmRisco = obrigatorias.filter(
+  // mesmo "não feito", tira a tarefa dessa lista). Tarefas que não valem
+  // hoje (sexta/sábado, pra quem pula fim de semana) nunca entram aqui.
+  const diariasEmRisco = obrigatoriasHoje.filter(
     (t) => t.frequencia === "diaria" && !statusAtual(t.id, t.frequencia)
   );
   const valorEmRiscoHoje = diariasEmRisco.reduce(
@@ -479,7 +496,9 @@ export default function CriancaDashboard({
 
       {tab === "hoje" && (
         <Catalogo
-          tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "diaria")}
+          tarefas={catalog.filter(
+            (t) => t.categoria !== "coletiva" && t.frequencia === "diaria" && !(t.pula_fim_de_semana && ehSextaOuSabado)
+          )}
           agruparPor="categoria"
         />
       )}

@@ -6,6 +6,7 @@ import ResponsavelDashboard from "@/components/ResponsavelDashboard";
 import CriancaDashboard from "@/components/CriancaDashboard";
 import BackToTopButton from "@/components/BackToTopButton";
 import MudarPinButton from "@/components/MudarPinButton";
+import EmojiButton from "@/components/EmojiButton";
 import type { PendingEvent } from "@/components/ConfirmQueue";
 import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana } from "@/lib/periodos";
@@ -33,7 +34,7 @@ export default async function Dashboard({
   const supabase = createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, kind, family_id, created_at, families(name)")
+    .select("id, name, kind, icon, family_id, created_at, families(name, valor_base_obrigatorias)")
     .eq("id", params.profileId)
     .single();
 
@@ -85,7 +86,9 @@ export default async function Dashboard({
 
     const { data: catalogoFamilia } = await supabase
       .from("task_catalog")
-      .select("id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, icone, ativo")
+      .select(
+        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo"
+      )
       .eq("family_id", familyId)
       .eq("ativo", true)
       .order("categoria");
@@ -209,12 +212,17 @@ export default async function Dashboard({
     }));
     const revisarCount = revisarCountRaw ?? 0;
 
+    const valorBaseObrigatorias = Number(
+      (profile.families as unknown as { valor_base_obrigatorias: number } | null)?.valor_base_obrigatorias ?? 90
+    );
+
     return (
       <Shell
-        title={`Olá, ${profile.name}`}
+        title={profile.name}
         onLogout={logout}
         onTrocarPerfil={trocarPerfil}
         pinButton={<MudarPinButton profileId={profile.id} />}
+        emojiButton={<EmojiButton profileId={profile.id} iconeAtual={profile.icon} />}
         mensagemPin={
           searchParams.erroPin
             ? { texto: searchParams.erroPin, tipo: "erro" }
@@ -236,6 +244,7 @@ export default async function Dashboard({
           descontosAjustes={descontosAjustes}
           revisarEventos={revisarEventos}
           revisarCount={revisarCount}
+          valorBaseObrigatorias={valorBaseObrigatorias}
         />
       </Shell>
     );
@@ -244,7 +253,7 @@ export default async function Dashboard({
   // Perfil criança
   const { data: catalog } = await supabase
     .from("task_catalog")
-    .select("id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, icone")
+    .select("id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone")
     .eq("family_id", familyId)
     .eq("ativo", true)
     .order("categoria");
@@ -344,7 +353,12 @@ export default async function Dashboard({
     .slice(0, 40);
 
   return (
-    <Shell title={`Oi, ${profile.name}!`} onLogout={logout} onTrocarPerfil={trocarPerfil}>
+    <Shell
+      title={`Vamos trabalhar, ${profile.name}?`}
+      onLogout={logout}
+      onTrocarPerfil={trocarPerfil}
+      emojiButton={<EmojiButton profileId={profile.id} iconeAtual={profile.icon} />}
+    >
       <CriancaDashboard
         nome={profile.name}
         familyId={familyId}
@@ -370,6 +384,7 @@ function Shell({
   onLogout,
   onTrocarPerfil,
   pinButton,
+  emojiButton,
   mensagemPin,
 }: {
   title: string;
@@ -377,6 +392,7 @@ function Shell({
   onLogout: () => void;
   onTrocarPerfil: () => void;
   pinButton?: React.ReactNode;
+  emojiButton?: React.ReactNode;
   mensagemPin?: { texto: string; tipo: "erro" | "sucesso" };
 }) {
   return (
@@ -385,6 +401,7 @@ function Shell({
       <header className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">{title}</h1>
         <div className="flex items-center gap-2">
+          {emojiButton}
           {pinButton}
           <form action={onTrocarPerfil}>
             <button className="text-sm text-slate-400 underline">trocar perfil</button>

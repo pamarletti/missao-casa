@@ -19,6 +19,7 @@ type Tarefa = {
   frequencia: string;
   valor_unitario: number;
   ocorrencias_por_dia: number;
+  pula_fim_de_semana: boolean;
   icone: string | null;
 };
 
@@ -58,6 +59,7 @@ export default function ResponsavelDashboard({
   descontosAjustes,
   revisarEventos,
   revisarCount,
+  valorBaseObrigatorias,
 }: {
   familyId: string;
   criancas: Crianca[];
@@ -71,6 +73,7 @@ export default function ResponsavelDashboard({
   descontosAjustes: DescontoItem[];
   revisarEventos: RevisarItem[];
   revisarCount: number;
+  valorBaseObrigatorias: number;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
 
@@ -80,11 +83,6 @@ export default function ResponsavelDashboard({
 
       {tab === "inicio" && (
         <>
-          <h2 className="text-lg font-semibold mb-3">Saldo acumulado</h2>
-          <p className="text-sm text-slate-400 -mt-2 mb-3">
-            Não zera no fim do mês — some as tarefas confirmadas e só diminui quando você registra uma retirada
-            abaixo ("Ajustar saldo" → "Remover").
-          </p>
           {criancas.map((c) => (
             <SaldoCard
               key={c.id}
@@ -114,7 +112,9 @@ export default function ResponsavelDashboard({
 
       {tab === "revisar" && <RevisarTarefasTab eventos={revisarEventos} count={revisarCount} />}
 
-      {tab === "catalogo" && <CatalogoEditavelTab catalog={catalog} />}
+      {tab === "catalogo" && (
+        <CatalogoEditavelTab catalog={catalog} familyId={familyId} valorBaseAtual={valorBaseObrigatorias} />
+      )}
 
       {tab === "historico" && <HistoricoPorPerfilTab criancas={criancas} atividades={atividades} />}
     </div>

@@ -25,7 +25,7 @@ export default async function ProfilePickerPage({
 
   const { data: profiles } = await supabase
     .from("profiles")
-    .select("id, name, kind")
+    .select("id, name, kind, icon")
     .eq("family_id", family.id)
     .order("kind", { ascending: true });
 
@@ -42,19 +42,26 @@ export default async function ProfilePickerPage({
             p.kind === "crianca" ? (
               <form key={p.id} action={selectChildProfile.bind(null, p.id)}>
                 <button type="submit" className="card w-full flex flex-col items-center gap-2 hover:ring-2 ring-casa-accent">
-                  <span className="text-4xl">{ICONS.crianca}</span>
+                  <span className="text-4xl">{p.icon || ICONS.crianca}</span>
                   <span className="font-semibold">{p.name}</span>
                 </button>
               </form>
             ) : (
               <details key={p.id} className="card" open={searchParams.perfil === p.id}>
                 <summary className="cursor-pointer flex flex-col items-center gap-2 list-none">
-                  <span className="text-4xl">{ICONS.responsavel}</span>
+                  <span className="text-4xl">{p.icon || ICONS.responsavel}</span>
                   <span className="font-semibold">{p.name}</span>
                 </summary>
                 <form action={verifyPinAndSelect} className="mt-3 space-y-2">
                   <input type="hidden" name="profileId" value={p.id} />
-                  <input name="pin" placeholder="PIN" inputMode="numeric" maxLength={4} autoFocus />
+                  <input
+                    type="password"
+                    name="pin"
+                    placeholder="PIN"
+                    inputMode="numeric"
+                    maxLength={4}
+                    autoFocus
+                  />
                   <button type="submit" className="btn-secondary w-full text-sm">
                     Entrar
                   </button>

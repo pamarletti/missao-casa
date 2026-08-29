@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { editarTarefa } from "@/app/app/[profileId]/actions";
+import { editarTarefa, definirValorBase } from "@/app/app/[profileId]/actions";
+import { valorMensalTotal } from "@/lib/valorBase";
 
 type Tarefa = {
   id: string;
   name: string;
   categoria: "individual" | "individual_coletiva" | "coletiva";
   subcategoria: string | null;
+  frequencia: string;
+  ocorrencias_por_dia: number;
+  pula_fim_de_semana: boolean;
   valor_unitario: number;
   icone: string | null;
 };
@@ -16,6 +20,14 @@ const CATEGORIA_LABEL: Record<string, string> = {
   individual: "Obrigatórias — individuais",
   individual_coletiva: "Obrigatórias — do quarto (individual-coletivas)",
   coletiva: "Coletivas (bônus)",
+};
+
+// Obrigatórias sempre antes das coletivas (bônus), independente da ordem
+// em que vieram do banco.
+const ORDEM_CATEGORIA: Record<string, number> = {
+  individual: 0,
+  individual_coletiva: 1,
+  coletiva: 2,
 };
 
 function ItemEditavel({ t }: { t: Tarefa }) {
@@ -67,10 +79,68 @@ function ItemEditavel({ t }: { t: Tarefa }) {
   );
 }
 
+/** Card no topo do catálogo editável: mostra quanto as tarefas obrigatórias
+ * (individuais + do quarto) somam por mês hoje, e deixa o responsável
+ * definir um novo valor base — os valores de cada tarefa são recalculados
+ * proporcionalmente para que a soma bata com o novo total. Editar uma
+ * tarefa individualmente (abaixo) também atualiza esse total sozinho. */
+function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string; catalog: Tarefa[]; valorBaseAtual: number }) {
+  const [aberto, setAberto] = useState(false);
+  const obrigatorias = catalog.filter((t) => t.categoria === "individual" || t.categoria === "individual_coletiva");
+  const totalAtual = valorMensalTotal(obrigatorias);
+
+  return (
+    <div className="card mb-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-slate-400 text-sm">Valor base mensal das tarefas obrigatórias</p>
+          <p className="text-2xl font-bold text-casa-accent">R$ {totalAtual.toFixed(2)}</p>
+          {Math.abs(totalAtual - Number(valorBaseAtual)) > 0.01 && (
+            <p className="text-xs text-slate-500 mt-1">
+              (valor base registrado: R$ {Number(valorBaseAtual).toFixed(2)})
+            </p>
+          )}
+        </div>
+        <button type="button" className="btn-secondary text-sm shrink-0" onClick={() => setAberto((v) => !v)}>
+          {aberto ? "cancelar" : "Mudar valor base"}
+        </button>
+      </div>
+
+      {aberto && (
+        <form action={definirValorBase} className="mt-3 space-y-2 border-t border-slate-700 pt-3">
+          <input type="hidden" name="familyId" value={familyId} />
+          <p className="text-xs text-slate-400">
+            Ao mudar esse valor, cada tarefa obrigatória é recalculada proporcionalmente para que a soma de todas
+            passe a bater com o novo total.
+          </p>
+          <input
+            name="valorBase"
+            defaultValue={totalAtual.toFixed(2)}
+            inputMode="decimal"
+            placeholder="Novo valor base (R$)"
+            required
+          />
+          <button className="btn-primary text-sm w-full" type="submit">
+            Recalcular tarefas obrigatórias
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 /** Catálogo editável — todas as tarefas por tipo, com nome, ícone e valor
  * ajustáveis a qualquer momento. A mudança vale a partir da edição: não
  * altera valores de tarefas já registradas antes dela. */
-export default function CatalogoEditavelTab({ catalog }: { catalog: Tarefa[] }) {
+export default function CatalogoEditavelTab({
+  catalog,
+  familyId,
+  valorBaseAtual,
+}: {
+  catalog: Tarefa[];
+  familyId: string;
+  valorBaseAtual: number;
+}) {
   const grupos = new Map<string, Tarefa[]>();
   for (const t of catalog) {
     const chave = CATEGORIA_LABEL[t.categoria] ?? t.categoria;
@@ -78,9 +148,18 @@ export default function CatalogoEditavelTab({ catalog }: { catalog: Tarefa[] }) 
     grupos.get(chave)!.push(t);
   }
 
+  const categoriaDoTitulo = (titulo: string) =>
+    Object.entries(CATEGORIA_LABEL).find(([, label]) => label === titulo)?.[0] ?? titulo;
+
+  const entradas = Array.from(grupos.entries()).sort(
+    (a, b) => (ORDEM_CATEGORIA[categoriaDoTitulo(a[0])] ?? 99) - (ORDEM_CATEGORIA[categoriaDoTitulo(b[0])] ?? 99)
+  );
+
   return (
     <div>
-      {Array.from(grupos.entries()).map(([titulo, tarefas]) => (
+      <ValorBaseCard familyId={familyId} catalog={catalog} valorBaseAtual={valorBaseAtual} />
+
+      {entradas.map(([titulo, tarefas]) => (
         <section key={titulo} className="mb-6">
           <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
           <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

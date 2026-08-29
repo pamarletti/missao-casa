@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveProfile } from "@/lib/activeProfile";
+import { valorMensalTotal } from "@/lib/valorBase";
 
 async function requireActiveProfile() {
   const active = await getActiveProfile();
@@ -169,7 +170,11 @@ export async function registrarDireto(
 }
 
 /** Um responsável edita nome, valor ou ícone de uma tarefa do catálogo —
- * vale a partir de agora, sem alterar valores de eventos já registrados. */
+ * vale a partir de agora, sem alterar valores de eventos já registrados.
+ * Se a tarefa editada for obrigatória (individual ou individual-coletiva),
+ * o "valor base" da família (o total mensal que ela representa) é
+ * recalculado automaticamente para refletir essa edição — sem mexer no
+ * valor das outras tarefas. */
 export async function editarTarefa(formData: FormData) {
   const active = await requireActiveProfile();
   if (active.kind !== "responsavel") return;
@@ -186,6 +191,73 @@ export async function editarTarefa(formData: FormData) {
 
   const supabase = createClient();
   await supabase.from("task_catalog").update({ name, valor_unitario: valorInformado, icone }).eq("id", taskId);
+
+  const { data: tarefaEditada } = await supabase
+    .from("task_catalog")
+    .select("family_id, categoria")
+    .eq("id", taskId)
+    .single();
+
+  if (tarefaEditada && (tarefaEditada.categoria === "individual" || tarefaEditada.categoria === "individual_coletiva")) {
+    const { data: obrigatorias } = await supabase
+      .from("task_catalog")
+      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")
+      .eq("family_id", tarefaEditada.family_id)
+      .in("categoria", ["individual", "individual_coletiva"])
+      .eq("ativo", true);
+
+    const novoTotal = valorMensalTotal(obrigatorias ?? []);
+    await supabase
+      .from("families")
+      .update({ valor_base_obrigatorias: Math.round(novoTotal * 100) / 100 })
+      .eq("id", tarefaEditada.family_id);
+  }
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** Um responsável define um novo "valor base" mensal para as tarefas
+ * obrigatórias (individuais + individual-coletivas) — o valor de cada
+ * tarefa é recalculado proporcionalmente ao peso que ela já tinha, de
+ * forma que a soma de todas passe a bater exatamente com o novo valor. */
+export async function definirValorBase(formData: FormData) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const familyId = String(formData.get("familyId") || "");
+  const novoValor = Number(String(formData.get("valorBase") || "0").replace(",", "."));
+
+  if (!familyId || !Number.isFinite(novoValor) || novoValor <= 0) {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
+  const supabase = createClient();
+  const { data: obrigatorias } = await supabase
+    .from("task_catalog")
+    .select("id, valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")
+    .eq("family_id", familyId)
+    .in("categoria", ["individual", "individual_coletiva"])
+    .eq("ativo", true);
+
+  if (!obrigatorias || obrigatorias.length === 0) {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
+  const totalAtual = valorMensalTotal(obrigatorias);
+  if (totalAtual <= 0) {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
+  const fator = novoValor / totalAtual;
+  for (const t of obrigatorias) {
+    const novoValorUnitario = Math.round(Number(t.valor_unitario) * fator * 100) / 100;
+    await supabase.from("task_catalog").update({ valor_unitario: novoValorUnitario }).eq("id", t.id);
+  }
+
+  await supabase.from("families").update({ valor_base_obrigatorias: novoValor }).eq("id", familyId);
 
   revalidatePath(`/app/${active.profileId}`);
 }

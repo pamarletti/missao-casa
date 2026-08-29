@@ -1,4 +1,5 @@
 import { resetPassword } from "./actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 export default function ResetPasswordPage({
   searchParams,
@@ -16,9 +17,9 @@ export default function ResetPasswordPage({
         <form action={resetPassword} className="space-y-3">
           <input type="password" name="password" placeholder="Nova senha" minLength={6} required />
           <input type="password" name="confirmacao" placeholder="Confirme a nova senha" minLength={6} required />
-          <button type="submit" className="btn-primary w-full">
+          <BotaoAcao className="btn-primary w-full" carregando="salvando…">
             Salvar nova senha
-          </button>
+          </BotaoAcao>
         </form>
       </div>
     </main>

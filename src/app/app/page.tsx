@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { selectChildProfile, verifyPinAndSelect, logout } from "./actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 const ICONS: Record<string, string> = { crianca: "🧒", responsavel: "🛡️" };
 
@@ -38,9 +39,13 @@ export default async function ProfilePickerPage({
         <p className="text-slate-400 text-sm text-center">Quem é você?</p>
         <div className="text-center">
           <form action={logout}>
-            <button className="text-xs text-slate-500 underline" title="Sair e voltar para o login/cadastro">
+            <BotaoAcao
+              className="text-xs text-slate-500 underline"
+              carregando="saindo…"
+              title="Sair e voltar para o login/cadastro"
+            >
               sair desta conta
-            </button>
+            </BotaoAcao>
           </form>
         </div>
 
@@ -48,10 +53,18 @@ export default async function ProfilePickerPage({
           {profiles.map((p) =>
             p.kind === "crianca" ? (
               <form key={p.id} action={selectChildProfile.bind(null, p.id)}>
-                <button type="submit" className="card w-full flex flex-col items-center gap-2 hover:ring-2 ring-casa-accent">
+                <BotaoAcao
+                  className="card w-full flex flex-col items-center gap-2 hover:ring-2 ring-casa-accent disabled:opacity-50"
+                  carregando={
+                    <>
+                      <span className="text-4xl">{p.icon || ICONS.crianca}</span>
+                      <span className="font-semibold text-slate-400">entrando…</span>
+                    </>
+                  }
+                >
                   <span className="text-4xl">{p.icon || ICONS.crianca}</span>
                   <span className="font-semibold">{p.name}</span>
-                </button>
+                </BotaoAcao>
               </form>
             ) : (
               <details key={p.id} className="card" open={searchParams.perfil === p.id}>
@@ -69,9 +82,9 @@ export default async function ProfilePickerPage({
                     maxLength={4}
                     autoFocus
                   />
-                  <button type="submit" className="btn-secondary w-full text-sm">
+                  <BotaoAcao className="btn-secondary w-full text-sm" carregando="entrando…">
                     Entrar
-                  </button>
+                  </BotaoAcao>
                   {searchParams.erro && searchParams.perfil === p.id && (
                     <p className="text-red-400 text-xs text-center">{searchParams.erro}</p>
                   )}

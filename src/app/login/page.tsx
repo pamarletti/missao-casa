@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { login } from "./actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 export default function LoginPage({
   searchParams,
@@ -28,9 +29,9 @@ export default function LoginPage({
         <form action={login} className="space-y-3">
           <input type="email" name="email" placeholder="E-mail da família" required />
           <input type="password" name="password" placeholder="Senha" required />
-          <button type="submit" className="btn-primary w-full">
+          <BotaoAcao className="btn-primary w-full" carregando="entrando…">
             Entrar
-          </button>
+          </BotaoAcao>
         </form>
 
         <p className="text-sm text-center">

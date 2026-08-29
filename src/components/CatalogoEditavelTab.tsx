@@ -4,6 +4,7 @@ import { useState } from "react";
 import { editarTarefa, definirValorBase } from "@/app/app/[profileId]/actions";
 import { valorMensalTotal } from "@/lib/valorBase";
 import CancelarContaButton from "@/components/CancelarContaButton";
+import { BotaoAcao } from "@/components/Carregando";
 
 type Tarefa = {
   id: string;
@@ -68,9 +69,9 @@ function ItemEditavel({ t }: { t: Tarefa }) {
           maxLength={4}
         />
         <div className="flex gap-2">
-          <button className="btn-primary text-xs flex-1" type="submit">
+          <BotaoAcao className="btn-primary text-xs flex-1" carregando="salvando…">
             Salvar
-          </button>
+          </BotaoAcao>
           <button type="button" className="text-xs text-slate-500 underline" onClick={() => setEditando(false)}>
             cancelar
           </button>
@@ -121,9 +122,9 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
             placeholder="Novo valor base (R$)"
             required
           />
-          <button className="btn-primary text-sm w-full" type="submit">
+          <BotaoAcao className="btn-primary text-sm w-full" carregando="recalculando…">
             Recalcular tarefas obrigatórias
-          </button>
+          </BotaoAcao>
         </form>
       )}
     </div>

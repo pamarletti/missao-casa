@@ -14,6 +14,7 @@ import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
+import { BotaoAcao } from "@/components/Carregando";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica usada
 // no antigo cron de desconto automático, agora substituído por decisão
@@ -529,10 +530,14 @@ function Shell({
           {emojiButton}
           {pinButton}
           <form action={onTrocarPerfil}>
-            <button className="text-sm text-slate-400 underline">trocar perfil</button>
+            <BotaoAcao className="text-sm text-slate-400 underline" carregando="…">
+              trocar perfil
+            </BotaoAcao>
           </form>
           <form action={onLogout}>
-            <button className="text-sm text-slate-500 underline">sair</button>
+            <BotaoAcao className="text-sm text-slate-500 underline" carregando="saindo…">
+              sair
+            </BotaoAcao>
           </form>
         </div>
       </header>

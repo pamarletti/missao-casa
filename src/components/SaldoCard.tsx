@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ajustarSaldo } from "@/app/app/[profileId]/actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 export default function SaldoCard({
   profileId,
@@ -55,9 +56,9 @@ export default function SaldoCard({
             <input type="number" step="0.01" min="0" name="valor" placeholder="Valor" required className="flex-1" />
           </div>
           <input type="text" name="motivo" placeholder="Motivo (opcional)" />
-          <button className="btn-primary text-sm w-full" type="submit">
+          <BotaoAcao className="btn-primary text-sm w-full" carregando="salvando…">
             Confirmar ajuste
-          </button>
+          </BotaoAcao>
         </form>
       )}
     </div>

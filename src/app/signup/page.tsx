@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signup } from "./actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 export default function SignupPage({
   searchParams,
@@ -24,9 +25,9 @@ export default function SignupPage({
           <input name="familyName" placeholder="Nome da família (ex.: Família Marletti)" required />
           <input type="email" name="email" placeholder="Seu e-mail" required />
           <input type="password" name="password" placeholder="Crie uma senha" minLength={6} required />
-          <button type="submit" className="btn-primary w-full">
+          <BotaoAcao className="btn-primary w-full" carregando="criando conta…">
             Criar conta
-          </button>
+          </BotaoAcao>
         </form>
 
         <p className="text-sm text-slate-400 text-center">

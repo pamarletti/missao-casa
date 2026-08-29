@@ -7,6 +7,7 @@ import { iconeTarefa } from "@/lib/iconeTarefa";
 import { ocorrenciasPorMes, ocorrenciasPorSemana } from "@/lib/valorBase";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
+import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
 // rotina de desconto automático em src/app/api/cron/desconto/route.ts).
@@ -138,17 +139,17 @@ export default function CriancaDashboard({
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
           {!evento && t.categoria !== "coletiva" && (
             <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
-              <button className="btn-primary text-xs w-full">Feito</button>
+              <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
             </form>
           )}
           {!evento && t.categoria === "coletiva" && (
             <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
-              <button className="btn-secondary text-xs w-full">Quero fazer</button>
+              <BotaoAcao className="btn-secondary text-xs w-full">Quero fazer</BotaoAcao>
             </form>
           )}
           {evento?.status === "liberada" && (
             <form action={markColetivaDone.bind(null, evento.id)} className="w-full">
-              <button className="btn-primary text-xs w-full">Feito</button>
+              <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
             </form>
           )}
           {evento && ["aguardando_confirmacao", "aguardando_autorizacao"].includes(evento.status) && (
@@ -156,13 +157,12 @@ export default function CriancaDashboard({
               <span className="text-xs text-amber-400">
                 {evento.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
               </span>
-              <button
-                type="button"
-                className="text-xs text-slate-500 underline"
-                onClick={() => cancelarPropriaMarcacao(evento.id)}
+              <BotaoDireto
+                className="text-xs text-slate-500 underline disabled:opacity-40"
+                acao={() => cancelarPropriaMarcacao(evento.id)}
               >
                 cancelar
-              </button>
+              </BotaoDireto>
             </>
           )}
           {evento?.status === "confirmado" && <span className="text-xs text-green-400">confirmado ✓</span>}
@@ -486,13 +486,12 @@ export default function CriancaDashboard({
                           {e.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className="text-xs text-slate-500 underline shrink-0"
-                        onClick={() => cancelarPropriaMarcacao(e.id)}
+                      <BotaoDireto
+                        className="text-xs text-slate-500 underline shrink-0 disabled:opacity-40"
+                        acao={() => cancelarPropriaMarcacao(e.id)}
                       >
                         cancelar
-                      </button>
+                      </BotaoDireto>
                     </li>
                   );
                 })}

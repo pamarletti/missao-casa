@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { mudarIcone } from "@/app/app/actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 /** Botão que qualquer perfil (responsável ou criança) usa para escolher o
  * próprio emoji — digita ou cola um emoji e salva. Aparece no topo do
@@ -33,9 +34,9 @@ export default function EmojiButton({ profileId, iconeAtual }: { profileId: stri
             autoFocus
             required
           />
-          <button className="btn-primary text-sm w-full" type="submit">
+          <BotaoAcao className="btn-primary text-sm w-full" carregando="salvando…">
             Salvar emoji
-          </button>
+          </BotaoAcao>
         </form>
       )}
     </div>

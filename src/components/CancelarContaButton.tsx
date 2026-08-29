@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cancelarContaFamilia } from "@/app/app/[profileId]/actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 /** Zona de perigo do responsável: apaga a conta da família inteira, para
  * sempre (login, perfis, catálogo, histórico e saldo de todo mundo). Exige
@@ -10,7 +11,6 @@ import { cancelarContaFamilia } from "@/app/app/[profileId]/actions";
 export default function CancelarContaButton() {
   const [aberto, setAberto] = useState(false);
   const [confirmacao, setConfirmacao] = useState("");
-  const [enviando, setEnviando] = useState(false);
 
   if (!aberto) {
     return (
@@ -51,10 +51,14 @@ export default function CancelarContaButton() {
         >
           Voltar
         </button>
-        <form action={cancelarContaFamilia} onSubmit={() => setEnviando(true)}>
-          <button type="submit" disabled={!habilitado || enviando} className="btn-danger text-sm disabled:opacity-40">
-            {enviando ? "Cancelando..." : "Sim, cancelar conta definitivamente"}
-          </button>
+        <form action={cancelarContaFamilia}>
+          <BotaoAcao
+            className="btn-danger text-sm disabled:opacity-40"
+            disabled={!habilitado}
+            carregando="cancelando…"
+          >
+            Sim, cancelar conta definitivamente
+          </BotaoAcao>
         </form>
       </div>
     </div>

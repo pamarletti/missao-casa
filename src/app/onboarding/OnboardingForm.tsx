@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import type { ReactNode } from "react";
+import { BotaoAcao } from "@/components/Carregando";
 
-/** Existe só pra evitar o bug de perfis duplicados: se a pessoa clicar
- * duas vezes em "Começar a usar" (dedo lento, rede lenta, dois toques por
- * engano), o botão já fica desabilitado depois do primeiro clique, então o
- * cadastro não é enviado duas vezes. O servidor (completeOnboarding) também
- * ganhou uma trava própria, independente desta aqui — ver comentário lá. */
+/** Existe por dois motivos, os dois ligados ao bug de perfis duplicados
+ * que aconteceu com uma família de teste: o botão "Começar a usar" precisa
+ * (a) avisar que está trabalhando, e (b) desabilitar depois do primeiro
+ * clique, pra o cadastro não ser enviado duas vezes. O BotaoAcao faz as
+ * duas coisas sozinho. O servidor (completeOnboarding) também tem uma
+ * trava própria, independente desta — ver comentário lá. */
 export default function OnboardingForm({
   action,
   children,
@@ -15,14 +16,12 @@ export default function OnboardingForm({
   action: (formData: FormData) => void;
   children: ReactNode;
 }) {
-  const [enviando, setEnviando] = useState(false);
-
   return (
-    <form action={action} className="space-y-6" onSubmit={() => setEnviando(true)}>
+    <form action={action} className="space-y-6">
       {children}
-      <button type="submit" disabled={enviando} className="btn-primary w-full disabled:opacity-50">
-        {enviando ? "Cadastrando..." : "Começar a usar"}
-      </button>
+      <BotaoAcao className="btn-primary w-full" carregando="cadastrando…">
+        Começar a usar
+      </BotaoAcao>
     </form>
   );
 }

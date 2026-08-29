@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { forgotPassword } from "./actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 export default function ForgotPasswordPage({
   searchParams,
@@ -19,9 +20,9 @@ export default function ForgotPasswordPage({
 
         <form action={forgotPassword} className="space-y-3">
           <input type="email" name="email" placeholder="Seu e-mail" required />
-          <button type="submit" className="btn-primary w-full">
+          <BotaoAcao className="btn-primary w-full" carregando="enviando…">
             Enviar link de redefinição
-          </button>
+          </BotaoAcao>
         </form>
 
         <p className="text-sm text-slate-400 text-center">

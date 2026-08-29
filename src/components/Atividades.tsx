@@ -1,6 +1,7 @@
 "use client";
 
 import { desfazerEvento, desfazerAjuste } from "@/app/app/[profileId]/actions";
+import { BotaoDireto } from "@/components/Carregando";
 
 export type AtividadeItem = {
   id: string;
@@ -40,12 +41,12 @@ export default function Atividades({
             </p>
           </div>
           {permitirDesfazer && (
-            <button
-              className="text-xs text-slate-500 underline shrink-0"
-              onClick={() => (item.tipo === "tarefa" ? desfazerEvento(item.id) : desfazerAjuste(item.id))}
+            <BotaoDireto
+              className="text-xs text-slate-500 underline shrink-0 disabled:opacity-40"
+              acao={() => (item.tipo === "tarefa" ? desfazerEvento(item.id) : desfazerAjuste(item.id))}
             >
               desfazer
-            </button>
+            </BotaoDireto>
           )}
         </li>
       ))}

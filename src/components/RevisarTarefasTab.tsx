@@ -1,6 +1,7 @@
 "use client";
 
 import { decidir, desfazerEvento } from "@/app/app/[profileId]/actions";
+import { BotaoDireto } from "@/components/Carregando";
 
 type Item = { id: string; data: string; status: string; valor: number; profileName: string; descricao: string };
 
@@ -34,18 +35,21 @@ export default function RevisarTarefasTab({ eventos, count }: { eventos: Item[];
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
-                <button className="btn-primary text-xs" onClick={() => decidir(e.id, "confirmar")}>
+                <BotaoDireto className="btn-primary text-xs" acao={() => decidir(e.id, "confirmar")}>
                   Confirmar
-                </button>
-                <button className="btn-secondary text-xs" onClick={() => decidir(e.id, "refazer")}>
+                </BotaoDireto>
+                <BotaoDireto className="btn-secondary text-xs" acao={() => decidir(e.id, "refazer")}>
                   Refazer
-                </button>
-                <button className="btn-danger text-xs" onClick={() => decidir(e.id, "nao_feito")}>
+                </BotaoDireto>
+                <BotaoDireto className="btn-danger text-xs" acao={() => decidir(e.id, "nao_feito")}>
                   Não feito
-                </button>
-                <button className="text-xs text-slate-500 underline" onClick={() => desfazerEvento(e.id)}>
+                </BotaoDireto>
+                <BotaoDireto
+                  className="text-xs text-slate-500 underline disabled:opacity-40"
+                  acao={() => desfazerEvento(e.id)}
+                >
                   excluir
-                </button>
+                </BotaoDireto>
               </div>
             </li>
           ))}

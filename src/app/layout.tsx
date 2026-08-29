@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { CarregandoProvider } from "@/components/Carregando";
 
 export const metadata: Metadata = {
   title: "Missão Casa",
@@ -14,7 +15,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <CarregandoProvider>{children}</CarregandoProvider>
+      </body>
     </html>
   );
 }

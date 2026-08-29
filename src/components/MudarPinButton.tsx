@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { mudarPin } from "@/app/app/actions";
+import { BotaoAcao } from "@/components/Carregando";
 
 export default function MudarPinButton({ profileId }: { profileId: string }) {
   const [aberto, setAberto] = useState(false);
@@ -46,9 +47,9 @@ export default function MudarPinButton({ profileId }: { profileId: string }) {
             maxLength={4}
             required
           />
-          <button className="btn-primary text-sm w-full" type="submit">
+          <BotaoAcao className="btn-primary text-sm w-full" carregando="salvando…">
             Salvar novo PIN
-          </button>
+          </BotaoAcao>
         </form>
       )}
     </div>

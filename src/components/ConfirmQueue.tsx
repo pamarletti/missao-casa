@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { decidir } from "@/app/app/[profileId]/actions";
+import { BotaoDireto } from "@/components/Carregando";
 
 export type PendingEvent = {
   id: string;
@@ -63,20 +64,20 @@ export default function ConfirmQueue({
           </div>
           <div className="flex gap-2 shrink-0">
             {e.status === "aguardando_autorizacao" ? (
-              <button className="btn-primary text-sm" onClick={() => decidir(e.id, "autorizar")}>
+              <BotaoDireto className="btn-primary text-sm" acao={() => decidir(e.id, "autorizar")}>
                 Liberar
-              </button>
+              </BotaoDireto>
             ) : (
               <>
-                <button className="btn-primary text-sm" onClick={() => decidir(e.id, "confirmar")}>
+                <BotaoDireto className="btn-primary text-sm" acao={() => decidir(e.id, "confirmar")}>
                   Confirmar
-                </button>
-                <button className="btn-secondary text-sm" onClick={() => decidir(e.id, "refazer")}>
+                </BotaoDireto>
+                <BotaoDireto className="btn-secondary text-sm" acao={() => decidir(e.id, "refazer")}>
                   Refazer
-                </button>
-                <button className="btn-danger text-sm" onClick={() => decidir(e.id, "nao_feito")}>
+                </BotaoDireto>
+                <BotaoDireto className="btn-danger text-sm" acao={() => decidir(e.id, "nao_feito")}>
                   Não feito
-                </button>
+                </BotaoDireto>
               </>
             )}
           </div>

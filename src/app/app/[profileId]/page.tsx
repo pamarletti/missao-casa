@@ -15,7 +15,9 @@ import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
 import type { ResumoFeitas } from "@/components/ResumoFeitasCard";
+import type { TotaisAtividades } from "@/components/TotaisAtividades";
 import { BotaoAcao } from "@/components/Carregando";
+import MenuPerfil, { ItemMenu } from "@/components/MenuPerfil";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica usada
 // no antigo cron de desconto automático, agora substituído por decisão
@@ -425,7 +427,7 @@ export default async function Dashboard({
   // acompanhar o progresso do mês corrente).
   const { data: eventosConfirmadosTotal, error: eventosTotalError } = await supabase
     .from("task_events")
-    .select("valor")
+    .select("valor, data")
     .eq("profile_id", profile.id)
     .in("status", ["confirmado", "desconto_automatico"]);
   if (eventosTotalError) console.error("Erro ao buscar total de tarefas confirmadas:", eventosTotalError.message);
@@ -456,6 +458,20 @@ export default async function Dashboard({
   const desdeInicio = new Date(profile.created_at).toLocaleDateString("pt-BR", {
     timeZone: "America/Recife",
   });
+
+  // Somatório das tarefas (obrigatórias + coletivas) em quatro janelas de
+  // tempo, mostrado com filtro na aba "Histórico de Atividades" do menino.
+  // Reaproveita a consulta acima, que já traz todos os eventos dele desde
+  // sempre — descontos entram negativos, então o número sai líquido.
+  const inicioSemanaProprio = inicioDaSemana(today);
+  const totaisAtividades: TotaisAtividades = { hoje: 0, semana: 0, mes: 0, total: 0 };
+  for (const evento of eventosConfirmadosTotal ?? []) {
+    const valorEvento = Number(evento.valor);
+    totaisAtividades.total += valorEvento;
+    if (evento.data >= inicioMes) totaisAtividades.mes += valorEvento;
+    if (evento.data >= inicioSemanaProprio) totaisAtividades.semana += valorEvento;
+    if (evento.data === today) totaisAtividades.hoje += valorEvento;
+  }
 
   const { count: numCriancasCount } = await supabase
     .from("profiles")
@@ -522,6 +538,7 @@ export default async function Dashboard({
         desdeInicio={desdeInicio}
         feitasMes={feitasMes}
         naoFeitasMes={naoFeitasMes}
+        totaisAtividades={totaisAtividades}
         numCriancas={numCriancas}
       />
     </Shell>
@@ -549,27 +566,33 @@ function Shell({
 }) {
   return (
     <main className="min-h-screen p-4 max-w-lg sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto">
-      <p className="text-center text-2xl font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
-      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-6">
-        <h1 className="text-xl font-bold flex items-center gap-2 min-w-0">
-          {title}
-          {nivelBadge}
-        </h1>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {emojiButton}
-          {pinButton}
-          <form action={onTrocarPerfil}>
-            <BotaoAcao className="text-sm text-slate-400 underline" carregando="…">
-              trocar perfil
-            </BotaoAcao>
-          </form>
-          <form action={onLogout}>
-            <BotaoAcao className="text-sm text-slate-500 underline" carregando="saindo…">
-              sair
-            </BotaoAcao>
-          </form>
-        </div>
+      <header className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-2xl font-bold text-slate-400 min-w-0">🏠 Missão Casa</p>
+
+        <MenuPerfil>
+          {emojiButton && <ItemMenu>{emojiButton}</ItemMenu>}
+          {pinButton && <ItemMenu>{pinButton}</ItemMenu>}
+          <ItemMenu>
+            <form action={onTrocarPerfil}>
+              <BotaoAcao className="text-sm text-slate-300 hover:text-white w-full text-left" carregando="trocando…">
+                trocar perfil
+              </BotaoAcao>
+            </form>
+          </ItemMenu>
+          <ItemMenu>
+            <form action={onLogout}>
+              <BotaoAcao className="text-sm text-red-400 hover:text-red-300 w-full text-left" carregando="saindo…">
+                sair
+              </BotaoAcao>
+            </form>
+          </ItemMenu>
+        </MenuPerfil>
       </header>
+
+      <h1 className="text-xl font-bold flex items-center gap-2 mb-6 min-w-0">
+        {title}
+        {nivelBadge}
+      </h1>
       {mensagemPin && (
         <p className={`text-sm -mt-4 mb-6 ${mensagemPin.tipo === "erro" ? "text-red-400" : "text-green-400"}`}>
           {mensagemPin.texto}

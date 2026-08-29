@@ -12,17 +12,17 @@ export default function EmojiButton({ profileId, iconeAtual }: { profileId: stri
   const [aberto, setAberto] = useState(false);
 
   return (
-    <div className="relative">
+    <div>
       <button
         type="button"
-        className="text-sm text-slate-400 underline"
+        className="text-sm text-slate-300 hover:text-white w-full text-left"
         onClick={() => setAberto((v) => !v)}
       >
-        {aberto ? "cancelar" : "mudar emoji"}
+        {aberto ? "cancelar" : "escolher emoji"}
       </button>
 
       {aberto && (
-        <form action={mudarIcone} className="card absolute right-0 mt-2 z-50 w-56 space-y-2 text-left">
+        <form action={mudarIcone} className="mt-2 space-y-2 text-left">
           <input type="hidden" name="profileId" value={profileId} />
           <p className="text-xs text-slate-400">Escolha um emoji para o seu perfil</p>
           <input

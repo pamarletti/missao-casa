@@ -116,21 +116,46 @@ export default function PendenciasTab({
                           </form>
                         </div>
                       ) : evento.status === "aguardando_confirmacao" ? (
-                        <BotaoDireto
-                          className="btn-primary text-xs px-2 py-0.5"
-                          title="Confirmar que foi feita"
-                          acao={() => decidir(evento.id, "confirmar")}
-                        >
-                          Confirmar
-                        </BotaoDireto>
+                        <div className="flex gap-1.5">
+                          <BotaoDireto
+                            className="btn-primary text-xs px-2 py-0.5"
+                            title="Confirmar que foi feita"
+                            acao={() => decidir(evento.id, "confirmar")}
+                          >
+                            ✓
+                          </BotaoDireto>
+                          <BotaoDireto
+                            className="btn-danger text-xs px-2 py-0.5"
+                            title="Marcar não feito"
+                            acao={() => decidir(evento.id, "nao_feito")}
+                          >
+                            ✗
+                          </BotaoDireto>
+                          <BotaoDireto
+                            className="btn-secondary text-xs px-2 py-0.5"
+                            title="Pedir para refazer"
+                            acao={() => decidir(evento.id, "refazer")}
+                          >
+                            ↩
+                          </BotaoDireto>
+                        </div>
                       ) : evento.status === "aguardando_autorizacao" ? (
-                        <BotaoDireto
-                          className="btn-primary text-xs px-2 py-0.5"
-                          title="Autorizar que ele faça"
-                          acao={() => decidir(evento.id, "autorizar")}
-                        >
-                          Autorizar
-                        </BotaoDireto>
+                        <div className="flex gap-1.5">
+                          <BotaoDireto
+                            className="btn-primary text-xs px-2 py-0.5"
+                            title="Autorizar que ele faça"
+                            acao={() => decidir(evento.id, "autorizar")}
+                          >
+                            ✓
+                          </BotaoDireto>
+                          <BotaoDireto
+                            className="btn-danger text-xs px-2 py-0.5"
+                            title="Marcar não feito"
+                            acao={() => decidir(evento.id, "nao_feito")}
+                          >
+                            ✗
+                          </BotaoDireto>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400">{STATUS_LABEL[evento.status] ?? evento.status}</span>
                       )}

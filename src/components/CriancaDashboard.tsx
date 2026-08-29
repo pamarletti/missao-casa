@@ -7,6 +7,7 @@ import { iconeTarefa } from "@/lib/iconeTarefa";
 import { ocorrenciasPorMes, ocorrenciasPorSemana } from "@/lib/valorBase";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
+import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
@@ -88,6 +89,7 @@ export default function CriancaDashboard({
   desdeInicio,
   feitasMes,
   naoFeitasMes,
+  totaisAtividades,
   numCriancas,
 }: {
   nome: string;
@@ -102,6 +104,7 @@ export default function CriancaDashboard({
   desdeInicio: string;
   feitasMes: number;
   naoFeitasMes: number;
+  totaisAtividades: TotaisAtividades;
   numCriancas: number;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
@@ -525,7 +528,12 @@ export default function CriancaDashboard({
 
       {tab === "catalogo" && <Catalogo tarefas={catalog} agruparPor="categoria" />}
 
-      {tab === "atividades" && <Atividades itens={atividades} permitirDesfazer={false} />}
+      {tab === "atividades" && (
+        <>
+          <TotaisAtividadesCard totais={totaisAtividades} />
+          <Atividades itens={atividades} permitirDesfazer={false} />
+        </>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { ocorrenciasPorMes, ocorrenciasPorSemana } from "@/lib/valorBase";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
+import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
@@ -108,6 +109,14 @@ export default function CriancaDashboard({
   numCriancas: number;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
+  const {
+    busca: buscaCatalogo,
+    setBusca: setBuscaCatalogo,
+    filtro: filtroCatalogo,
+    setFiltro: setFiltroCatalogo,
+    subcategorias: subcategoriasCatalogo,
+    filtradas: catalogoFiltrado,
+  } = useFiltroCatalogo(catalog);
 
   // Relógio ao vivo (atualiza a cada 30s) pra contagem regressiva do fim do
   // dia e do fim da semana funcionar sozinha na tela, sem precisar recarregar.
@@ -526,7 +535,20 @@ export default function CriancaDashboard({
         <Catalogo tarefas={catalog.filter((t) => t.categoria === "coletiva")} agruparPor="subcategoria" />
       )}
 
-      {tab === "catalogo" && <Catalogo tarefas={catalog} agruparPor="categoria" />}
+      {tab === "catalogo" && (
+        <>
+          <ControlesCatalogo
+            busca={buscaCatalogo}
+            setBusca={setBuscaCatalogo}
+            filtro={filtroCatalogo}
+            setFiltro={setFiltroCatalogo}
+            subcategorias={subcategoriasCatalogo}
+            mostrando={catalogoFiltrado.length}
+            total={catalog.length}
+          />
+          <Catalogo tarefas={catalogoFiltrado} agruparPor="categoria" />
+        </>
+      )}
 
       {tab === "atividades" && (
         <>

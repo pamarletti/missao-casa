@@ -4,6 +4,7 @@ import { useState } from "react";
 import { editarTarefa, definirValorBase } from "@/app/app/[profileId]/actions";
 import { valorMensalTotal } from "@/lib/valorBase";
 import CancelarContaButton from "@/components/CancelarContaButton";
+import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
 import { BotaoAcao } from "@/components/Carregando";
 
 type Tarefa = {
@@ -143,8 +144,10 @@ export default function CatalogoEditavelTab({
   familyId: string;
   valorBaseAtual: number;
 }) {
+  const { busca, setBusca, filtro, setFiltro, subcategorias, filtradas } = useFiltroCatalogo(catalog);
+
   const grupos = new Map<string, Tarefa[]>();
-  for (const t of catalog) {
+  for (const t of filtradas) {
     const chave = CATEGORIA_LABEL[t.categoria] ?? t.categoria;
     if (!grupos.has(chave)) grupos.set(chave, []);
     grupos.get(chave)!.push(t);
@@ -160,6 +163,16 @@ export default function CatalogoEditavelTab({
   return (
     <div>
       <ValorBaseCard familyId={familyId} catalog={catalog} valorBaseAtual={valorBaseAtual} />
+
+      <ControlesCatalogo
+        busca={busca}
+        setBusca={setBusca}
+        filtro={filtro}
+        setFiltro={setFiltro}
+        subcategorias={subcategorias}
+        mostrando={filtradas.length}
+        total={catalog.length}
+      />
 
       {entradas.map(([titulo, tarefas]) => (
         <section key={titulo} className="mb-6">

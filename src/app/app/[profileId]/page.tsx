@@ -241,6 +241,7 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   return (
     <Shell title={`Oi, ${profile.name}!`} onLogout={logout} onTrocarPerfil={trocarPerfil}>
       <CriancaDashboard
+        nome={profile.name}
         familyId={familyId}
         today={today}
         catalog={catalog ?? []}

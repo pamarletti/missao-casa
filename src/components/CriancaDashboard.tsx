@@ -136,6 +136,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function CriancaDashboard({
+  nome,
   familyId,
   today,
   catalog,
@@ -149,6 +150,7 @@ export default function CriancaDashboard({
   naoFeitasMes,
   numCriancas,
 }: {
+  nome: string;
   familyId: string;
   today: string;
   catalog: Tarefa[];
@@ -364,7 +366,7 @@ export default function CriancaDashboard({
       {tab === "inicio" && (
         <>
           <div className="card mb-4">
-            <p className="text-slate-400 text-sm">Saldo disponível</p>
+            <p className="text-slate-400 text-sm">Saldo disponível para {nome}</p>
             <p className="text-3xl font-bold text-casa-accent">R$ {saldoAtual.toFixed(2)}</p>
 
             <div className="flex justify-between text-center mt-3 pt-3 border-t border-slate-700">

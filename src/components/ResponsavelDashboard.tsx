@@ -85,11 +85,11 @@ export default function ResponsavelDashboard({
           {Array.from(grupos.entries()).map(([titulo, tarefas]) => (
             <section key={titulo} className="mb-6">
               <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
-              <ul className="space-y-2">
+              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {tarefas.map((t) => (
-                  <li key={t.id} className="card flex items-center justify-between">
-                    <p className="font-medium">{t.name}</p>
-                    <p className="text-sm text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
+                  <li key={t.id} className="card p-3 flex flex-col items-center text-center gap-1">
+                    <p className="font-medium text-sm leading-tight">{t.name}</p>
+                    <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
                   </li>
                 ))}
               </ul>

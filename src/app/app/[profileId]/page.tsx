@@ -26,7 +26,7 @@ export default async function Dashboard({ params }: { params: { profileId: strin
   const supabase = createClient();
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, kind, family_id, families(name)")
+    .select("id, name, kind, family_id, created_at, families(name)")
     .eq("id", params.profileId)
     .single();
 
@@ -177,6 +177,23 @@ export default async function Dashboard({ params }: { params: { profileId: strin
     (eventosConfirmadosTotal ?? []).reduce((acc, e) => acc + Number(e.valor), 0) +
     (ajustesTotalProprio ?? []).reduce((acc, a) => acc + Number(a.valor), 0);
 
+  // Ganhos = tudo que somou no saldo desde o início (tarefas confirmadas +
+  // créditos manuais). Descontos = tudo que tirou do saldo (descontos
+  // automáticos por silêncio + retiradas/remoções manuais), mostrado como
+  // valor positivo. Ganhos - Descontos bate exatamente com o saldo atual.
+  const todosValoresProprios = [
+    ...(eventosConfirmadosTotal ?? []).map((e) => Number(e.valor)),
+    ...(ajustesTotalProprio ?? []).map((a) => Number(a.valor)),
+  ];
+  const ganhosAtual = todosValoresProprios.filter((v) => v > 0).reduce((acc, v) => acc + v, 0);
+  const descontosAtual = Math.abs(
+    todosValoresProprios.filter((v) => v < 0).reduce((acc, v) => acc + v, 0)
+  );
+
+  const desdeInicio = new Date(profile.created_at).toLocaleDateString("pt-BR", {
+    timeZone: "America/Recife",
+  });
+
   const { count: numCriancasCount } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
@@ -230,6 +247,9 @@ export default async function Dashboard({ params }: { params: { profileId: strin
         eventosMes={eventos}
         atividades={atividades}
         saldoAtual={saldoAtual}
+        ganhosAtual={ganhosAtual}
+        descontosAtual={descontosAtual}
+        desdeInicio={desdeInicio}
         feitasMes={feitasMes}
         naoFeitasMes={naoFeitasMes}
         numCriancas={numCriancas}

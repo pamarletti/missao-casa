@@ -69,6 +69,9 @@ export default function CriancaDashboard({
   eventosMes,
   atividades,
   saldoAtual,
+  ganhosAtual,
+  descontosAtual,
+  desdeInicio,
   feitasMes,
   naoFeitasMes,
   numCriancas,
@@ -79,6 +82,9 @@ export default function CriancaDashboard({
   eventosMes: EventoMes[];
   atividades: AtividadeItem[];
   saldoAtual: number;
+  ganhosAtual: number;
+  descontosAtual: number;
+  desdeInicio: string;
   feitasMes: number;
   naoFeitasMes: number;
   numCriancas: number;
@@ -102,30 +108,28 @@ export default function CriancaDashboard({
   function TarefaRow({ t }: { t: Tarefa }) {
     const evento = statusAtual(t.id, t.frequencia);
     return (
-      <li className="card flex items-center justify-between gap-3">
-        <div>
-          <p className="font-medium">{t.name}</p>
-          <p className="text-sm text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+      <li className="card p-3 flex flex-col items-center text-center gap-1">
+        <p className="font-medium text-sm leading-tight">{t.name}</p>
+        <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
+        <div className="flex flex-col items-center gap-1 mt-1 w-full">
           {!evento && t.categoria !== "coletiva" && (
-            <form action={markOrRequest.bind(null, t.id, familyId)}>
-              <button className="btn-primary text-sm">Feito</button>
+            <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
+              <button className="btn-primary text-xs w-full">Feito</button>
             </form>
           )}
           {!evento && t.categoria === "coletiva" && (
-            <form action={markOrRequest.bind(null, t.id, familyId)}>
-              <button className="btn-secondary text-sm">Quero fazer</button>
+            <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
+              <button className="btn-secondary text-xs w-full">Quero fazer</button>
             </form>
           )}
           {evento?.status === "liberada" && (
-            <form action={markColetivaDone.bind(null, evento.id)}>
-              <button className="btn-primary text-sm">Feito</button>
+            <form action={markColetivaDone.bind(null, evento.id)} className="w-full">
+              <button className="btn-primary text-xs w-full">Feito</button>
             </form>
           )}
           {evento && ["aguardando_confirmacao", "aguardando_autorizacao"].includes(evento.status) && (
             <>
-              <span className="text-sm text-amber-400">
+              <span className="text-xs text-amber-400">
                 {evento.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
               </span>
               <button
@@ -137,10 +141,10 @@ export default function CriancaDashboard({
               </button>
             </>
           )}
-          {evento?.status === "confirmado" && <span className="text-sm text-green-400">confirmado ✓</span>}
-          {evento?.status === "nao_feito" && <span className="text-sm text-red-400">não feito</span>}
+          {evento?.status === "confirmado" && <span className="text-xs text-green-400">confirmado ✓</span>}
+          {evento?.status === "nao_feito" && <span className="text-xs text-red-400">não feito</span>}
           {evento?.status === "pedido_para_refazer" && (
-            <span className="text-sm text-amber-400">pedido para refazer</span>
+            <span className="text-xs text-amber-400">pedido para refazer</span>
           )}
         </div>
       </li>
@@ -162,7 +166,7 @@ export default function CriancaDashboard({
         {Array.from(grupos.entries()).map(([titulo, tarefasDoGrupo]) => (
           <section key={titulo} className="mb-6">
             <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
-            <ul className="space-y-2">
+            <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {tarefasDoGrupo.map((t) => (
                 <TarefaRow key={t.id} t={t} />
               ))}
@@ -288,12 +292,27 @@ export default function CriancaDashboard({
           <div className="card mb-4">
             <p className="text-slate-400 text-sm">Saldo disponível</p>
             <p className="text-3xl font-bold text-casa-accent">R$ {saldoAtual.toFixed(2)}</p>
+
+            <div className="flex justify-between text-center mt-3 pt-3 border-t border-slate-700">
+              <div>
+                <p className="text-xs text-slate-400">Ganhos</p>
+                <p className="font-semibold text-green-400">R$ {ganhosAtual.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Descontos</p>
+                <p className="font-semibold text-red-400">-R$ {descontosAtual.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Desde o início em</p>
+                <p className="font-semibold">{desdeInicio}</p>
+              </div>
+            </div>
           </div>
 
           <div className="card mb-4">
             <p className="text-sm text-slate-400 mb-3">🙌 Tem um tempinho?</p>
             {sugestoesTempinho.length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {sugestoesTempinho.map((t) => (
                   <TarefaRow key={t.id} t={t} />
                 ))}

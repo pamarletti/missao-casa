@@ -22,8 +22,8 @@ export default function SaldoCard({
   return (
     <div className="card mb-3">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-slate-400 text-sm flex items-center gap-2">
+        <div className="min-w-0">
+          <p className="text-slate-400 text-sm flex items-center gap-2 flex-wrap">
             Saldo acumulado por {name}
             {nivelBadge}
           </p>

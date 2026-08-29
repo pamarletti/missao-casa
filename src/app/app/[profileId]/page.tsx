@@ -521,12 +521,12 @@ function Shell({
   return (
     <main className="min-h-screen p-4 max-w-lg sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto">
       <p className="text-center text-2xl font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold flex items-center gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-6">
+        <h1 className="text-xl font-bold flex items-center gap-2 min-w-0">
           {title}
           {nivelBadge}
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {emojiButton}
           {pinButton}
           <form action={onTrocarPerfil}>

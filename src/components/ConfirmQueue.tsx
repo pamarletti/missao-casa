@@ -54,28 +54,28 @@ export default function ConfirmQueue({
   return (
     <ul className="space-y-3">
       {events.map((e) => (
-        <li key={e.id} className="card flex items-center justify-between gap-3">
-          <div>
+        <li key={e.id} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <p className="font-semibold">{e.task_catalog?.name ?? "Tarefa"}</p>
             <p className="text-sm text-slate-400">
               {e.profiles?.name} · R$ {Number(e.valor).toFixed(2)} ·{" "}
               {e.status === "aguardando_autorizacao" ? "pedindo autorização" : "aguardando confirmação"}
             </p>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
             {e.status === "aguardando_autorizacao" ? (
-              <BotaoDireto className="btn-primary text-sm" acao={() => decidir(e.id, "autorizar")}>
+              <BotaoDireto className="btn-primary text-sm w-full sm:w-auto" acao={() => decidir(e.id, "autorizar")}>
                 Liberar
               </BotaoDireto>
             ) : (
               <>
-                <BotaoDireto className="btn-primary text-sm" acao={() => decidir(e.id, "confirmar")}>
+                <BotaoDireto className="btn-primary text-sm w-full sm:w-auto" acao={() => decidir(e.id, "confirmar")}>
                   Confirmar
                 </BotaoDireto>
-                <BotaoDireto className="btn-secondary text-sm" acao={() => decidir(e.id, "refazer")}>
+                <BotaoDireto className="btn-secondary text-sm w-full sm:w-auto" acao={() => decidir(e.id, "refazer")}>
                   Refazer
                 </BotaoDireto>
-                <BotaoDireto className="btn-danger text-sm" acao={() => decidir(e.id, "nao_feito")}>
+                <BotaoDireto className="btn-danger text-sm w-full sm:w-auto" acao={() => decidir(e.id, "nao_feito")}>
                   Não feito
                 </BotaoDireto>
               </>

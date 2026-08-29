@@ -32,7 +32,7 @@ export default function Atividades({
     <ul className="space-y-2">
       {itens.map((item) => (
         <li key={`${item.tipo}-${item.id}`} className="card flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="font-medium">{item.descricao}</p>
             <p className="text-sm text-slate-400">
               {item.quemNome ? `${item.quemNome} · ` : ""}

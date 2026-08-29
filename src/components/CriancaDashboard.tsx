@@ -480,7 +480,7 @@ export default function CriancaDashboard({
                   const tarefa = catalog.find((t) => t.id === e.task_id);
                   return (
                     <li key={e.id} className="card flex items-center justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
                         <p className="text-sm text-amber-400">
                           {e.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}

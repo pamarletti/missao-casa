@@ -160,9 +160,9 @@ export default function PendenciasTab({
                   return (
                     <li
                       key={`${a.taskId}|${a.profileId}|${a.data}`}
-                      className="card flex items-center justify-between gap-3 flex-wrap"
+                      className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xl">{tarefa ? iconeTarefa(tarefa) : "❓"}</span>
                         <div>
                           <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
@@ -171,22 +171,32 @@ export default function PendenciasTab({
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        <form action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "feito")}>
-                          <BotaoAcao className="btn-primary text-xs px-2 py-1" title="Marcar feito">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:gap-1.5 sm:shrink-0">
+                        <form
+                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "feito")}
+                          className="w-full sm:w-auto"
+                        >
+                          <BotaoAcao className="btn-primary text-xs px-2 py-1 w-full sm:w-auto" title="Marcar feito">
                             Feito
                           </BotaoAcao>
                         </form>
-                        <form action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "nao_feito")}>
-                          <BotaoAcao className="btn-danger text-xs px-2 py-1" title="Marcar não feito (desconta)">
+                        <form
+                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "nao_feito")}
+                          className="w-full sm:w-auto"
+                        >
+                          <BotaoAcao
+                            className="btn-danger text-xs px-2 py-1 w-full sm:w-auto"
+                            title="Marcar não feito (desconta)"
+                          >
                             Não feito
                           </BotaoAcao>
                         </form>
                         <form
                           action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "desconsiderar")}
+                          className="w-full sm:w-auto"
                         >
                           <BotaoAcao
-                            className="btn-secondary text-xs px-2 py-1"
+                            className="btn-secondary text-xs px-2 py-1 w-full sm:w-auto"
                             title="Desconsiderar (não mexe no saldo)"
                           >
                             Desconsiderar

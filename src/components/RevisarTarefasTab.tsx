@@ -26,26 +26,26 @@ export default function RevisarTarefasTab({ eventos, count }: { eventos: Item[];
       ) : (
         <ul className="space-y-2">
           {eventos.map((e) => (
-            <li key={e.id} className="card flex items-center justify-between gap-3 flex-wrap">
-              <div>
+            <li key={e.id} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <p className="font-medium">{e.descricao}</p>
                 <p className="text-sm text-slate-400">
                   {e.profileName} · {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR")} · R${" "}
                   {Number(e.valor).toFixed(2)} · {STATUS_LABEL[e.status] ?? e.status}
                 </p>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <BotaoDireto className="btn-primary text-xs" acao={() => decidir(e.id, "confirmar")}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:shrink-0">
+                <BotaoDireto className="btn-primary text-xs w-full sm:w-auto" acao={() => decidir(e.id, "confirmar")}>
                   Confirmar
                 </BotaoDireto>
-                <BotaoDireto className="btn-secondary text-xs" acao={() => decidir(e.id, "refazer")}>
+                <BotaoDireto className="btn-secondary text-xs w-full sm:w-auto" acao={() => decidir(e.id, "refazer")}>
                   Refazer
                 </BotaoDireto>
-                <BotaoDireto className="btn-danger text-xs" acao={() => decidir(e.id, "nao_feito")}>
+                <BotaoDireto className="btn-danger text-xs w-full sm:w-auto" acao={() => decidir(e.id, "nao_feito")}>
                   Não feito
                 </BotaoDireto>
                 <BotaoDireto
-                  className="text-xs text-slate-500 underline disabled:opacity-40"
+                  className="text-xs text-slate-500 underline disabled:opacity-40 py-1"
                   acao={() => desfazerEvento(e.id)}
                 >
                   excluir

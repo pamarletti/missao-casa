@@ -34,6 +34,43 @@ export async function verifyPinAndSelect(formData: FormData) {
   redirect(`/app/${profileId}`);
 }
 
+export async function mudarPin(formData: FormData) {
+  const profileId = String(formData.get("profileId") || "");
+  const pinAtual = String(formData.get("pinAtual") || "");
+  const novoPin = String(formData.get("novoPin") || "");
+  const confirmacao = String(formData.get("confirmacao") || "");
+
+  if (!/^\d{4}$/.test(novoPin)) {
+    redirect(`/app/${profileId}?erroPin=${encodeURIComponent("O novo PIN precisa ter exatamente 4 números")}`);
+  }
+  if (novoPin !== confirmacao) {
+    redirect(`/app/${profileId}?erroPin=${encodeURIComponent("A confirmação não bate com o novo PIN")}`);
+  }
+
+  const supabase = createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, pin_hash")
+    .eq("id", profileId)
+    .eq("kind", "responsavel")
+    .single();
+
+  if (!profile || profile.pin_hash !== hashPin(pinAtual)) {
+    redirect(`/app/${profileId}?erroPin=${encodeURIComponent("PIN atual incorreto")}`);
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ pin_hash: hashPin(novoPin) })
+    .eq("id", profileId);
+
+  if (error) {
+    redirect(`/app/${profileId}?erroPin=${encodeURIComponent("Não deu pra salvar o novo PIN, tenta de novo")}`);
+  }
+
+  redirect(`/app/${profileId}?pinAlterado=1`);
+}
+
 export async function logout() {
   const supabase = createClient();
   await clearActiveProfile();

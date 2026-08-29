@@ -5,6 +5,7 @@ import { trocarPerfil, logout } from "@/app/app/actions";
 import ResponsavelDashboard from "@/components/ResponsavelDashboard";
 import CriancaDashboard from "@/components/CriancaDashboard";
 import BackToTopButton from "@/components/BackToTopButton";
+import MudarPinButton from "@/components/MudarPinButton";
 import type { PendingEvent } from "@/components/ConfirmQueue";
 import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes } from "@/lib/periodos";
@@ -19,7 +20,13 @@ const STATUS_LABEL: Record<string, string> = {
   desconto_automatico: "desconto automático",
 };
 
-export default async function Dashboard({ params }: { params: { profileId: string } }) {
+export default async function Dashboard({
+  params,
+  searchParams,
+}: {
+  params: { profileId: string };
+  searchParams: { erroPin?: string; pinAlterado?: string };
+}) {
   const active = await getActiveProfile();
   if (!active || active.profileId !== params.profileId) redirect("/app");
 
@@ -123,7 +130,19 @@ export default async function Dashboard({ params }: { params: { profileId: strin
       .slice(0, 60);
 
     return (
-      <Shell title={`Olá, ${profile.name}`} onLogout={logout} onTrocarPerfil={trocarPerfil}>
+      <Shell
+        title={`Olá, ${profile.name}`}
+        onLogout={logout}
+        onTrocarPerfil={trocarPerfil}
+        pinButton={<MudarPinButton profileId={profile.id} />}
+        mensagemPin={
+          searchParams.erroPin
+            ? { texto: searchParams.erroPin, tipo: "erro" }
+            : searchParams.pinAlterado
+              ? { texto: "PIN alterado com sucesso!", tipo: "sucesso" }
+              : undefined
+        }
+      >
         <ResponsavelDashboard
           familyId={familyId}
           criancas={criancas ?? []}
@@ -264,18 +283,23 @@ function Shell({
   children,
   onLogout,
   onTrocarPerfil,
+  pinButton,
+  mensagemPin,
 }: {
   title: string;
   children: React.ReactNode;
   onLogout: () => void;
   onTrocarPerfil: () => void;
+  pinButton?: React.ReactNode;
+  mensagemPin?: { texto: string; tipo: "erro" | "sucesso" };
 }) {
   return (
     <main className="min-h-screen p-4 max-w-lg sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto">
       <p className="text-center text-lg font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
       <header className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">{title}</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {pinButton}
           <form action={onTrocarPerfil}>
             <button className="text-sm text-slate-400 underline">trocar perfil</button>
           </form>
@@ -284,6 +308,11 @@ function Shell({
           </form>
         </div>
       </header>
+      {mensagemPin && (
+        <p className={`text-sm -mt-4 mb-6 ${mensagemPin.tipo === "erro" ? "text-red-400" : "text-green-400"}`}>
+          {mensagemPin.texto}
+        </p>
+      )}
       {children}
 
       <p className="text-center text-2xl font-bold text-slate-400 mt-10 mb-4">Missão cumprida! 🎉</p>

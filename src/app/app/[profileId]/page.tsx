@@ -14,6 +14,7 @@ import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
+import type { ResumoFeitas } from "@/components/ResumoFeitasCard";
 import { BotaoAcao } from "@/components/Carregando";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica usada
@@ -73,7 +74,7 @@ export default async function Dashboard({
 
     const { data: criancas } = await supabase
       .from("profiles")
-      .select("id, name, created_at")
+      .select("id, name, icon, created_at")
       .eq("family_id", familyId)
       .eq("kind", "crianca")
       .order("name");
@@ -141,6 +142,33 @@ export default async function Dashboard({
         (Date.now() - new Date(c.created_at).getTime()) / (24 * 60 * 60 * 1000)
       );
       nivelPorPerfil[c.id] = calcularNivel(ganhoLiquido30PorPerfil[c.id] ?? 0, potencial30Dias, diasDesdeCriacao);
+    }
+
+    // Resumo de tarefas feitas no mês, por criança, separado por tipo —
+    // conta só o que o responsável já confirmou (uma marcação ainda
+    // esperando decisão não entra). Pega a categoria/frequência pelo embed
+    // em task_catalog, e não pelo catálogo ativo, pra continuar contando
+    // certo tarefas que foram desativadas no meio do caminho.
+    const { data: feitasMesRaw, error: feitasMesError } = await supabase
+      .from("task_events")
+      .select("profile_id, task_catalog(categoria, frequencia)")
+      .eq("family_id", familyId)
+      .gte("data", inicioDoMes(today))
+      .eq("status", "confirmado");
+    if (feitasMesError) console.error("Erro ao buscar tarefas feitas no mês:", feitasMesError.message);
+
+    const resumoFeitasPorPerfil: Record<string, ResumoFeitas> = {};
+    for (const crianca of criancas ?? []) {
+      resumoFeitasPorPerfil[crianca.id] = { diarias: 0, semanais: 0, coletivas: 0, total: 0 };
+    }
+    for (const evento of feitasMesRaw ?? []) {
+      const tarefa = evento.task_catalog as unknown as { categoria: string; frequencia: string } | null;
+      const resumo = resumoFeitasPorPerfil[evento.profile_id];
+      if (!tarefa || !resumo) continue;
+      if (tarefa.categoria === "coletiva") resumo.coletivas += 1;
+      else if (tarefa.frequencia === "semanal") resumo.semanais += 1;
+      else resumo.diarias += 1;
+      resumo.total += 1;
     }
 
     // "Atrasadas": tarefas obrigatórias DIÁRIAS que ficaram em silêncio total
@@ -335,6 +363,7 @@ export default async function Dashboard({
           hojeISO={today}
           eventosSemanaTodos={eventosSemanaTodos ?? []}
           atrasadas={atrasadas}
+          resumoFeitas={resumoFeitasPorPerfil}
           descontosEventos={descontosEventos}
           descontosAjustes={descontosAjustes}
           revisarEventos={revisarEventos}

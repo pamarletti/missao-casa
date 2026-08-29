@@ -1,9 +1,9 @@
 "use client";
 
-import { registrarDireto, registrarAtrasada } from "@/app/app/[profileId]/actions";
+import { registrarDireto, registrarAtrasada, decidir } from "@/app/app/[profileId]/actions";
 import { inicioDaJanela } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
-import { BotaoAcao } from "@/components/Carregando";
+import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
 type Tarefa = {
   id: string;
@@ -22,6 +22,10 @@ type Crianca = { id: string; name: string };
  * ele. Calculada no servidor (src/app/app/[profileId]/page.tsx), olhando
  * os últimos 14 dias. */
 export type Atrasada = { data: string; taskId: string; profileId: string };
+
+/** Status em que a bola está com o responsável: a tarefa continua na lista
+ * de Pendências até ele decidir, com um botão pra resolver ali mesmo. */
+const ESPERANDO_DECISAO = ["aguardando_confirmacao", "aguardando_autorizacao"];
 
 const STATUS_LABEL: Record<string, string> = {
   aguardando_autorizacao: "aguardando autorização",
@@ -74,7 +78,9 @@ export default function PendenciasTab({
         tarefa: t,
         porFilho: criancas.map((c) => ({ crianca: c, evento: statusDoFilho(t.id, t.frequencia, c.id) })),
       }))
-      .filter((linha) => linha.porFilho.some((pf) => !pf.evento));
+      .filter((linha) =>
+        linha.porFilho.some((pf) => !pf.evento || ESPERANDO_DECISAO.includes(pf.evento.status))
+      );
 
     return (
       <section className="mb-6">
@@ -109,6 +115,22 @@ export default function PendenciasTab({
                             </BotaoAcao>
                           </form>
                         </div>
+                      ) : evento.status === "aguardando_confirmacao" ? (
+                        <BotaoDireto
+                          className="btn-primary text-xs px-2 py-0.5"
+                          title="Confirmar que foi feita"
+                          acao={() => decidir(evento.id, "confirmar")}
+                        >
+                          Confirmar
+                        </BotaoDireto>
+                      ) : evento.status === "aguardando_autorizacao" ? (
+                        <BotaoDireto
+                          className="btn-primary text-xs px-2 py-0.5"
+                          title="Autorizar que ele faça"
+                          acao={() => decidir(evento.id, "autorizar")}
+                        >
+                          Autorizar
+                        </BotaoDireto>
                       ) : (
                         <span className="text-xs text-slate-400">{STATUS_LABEL[evento.status] ?? evento.status}</span>
                       )}

@@ -8,6 +8,7 @@ import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
 import TabBar from "@/components/TabBar";
 import { type AtividadeItem } from "@/components/Atividades";
 import PendenciasTab, { type Atrasada } from "@/components/PendenciasTab";
+import ResumoFeitasCard, { type ResumoFeitas } from "@/components/ResumoFeitasCard";
 import DescontosPorDiaTab from "@/components/DescontosPorDiaTab";
 import RevisarTarefasTab from "@/components/RevisarTarefasTab";
 import CatalogoEditavelTab from "@/components/CatalogoEditavelTab";
@@ -25,7 +26,7 @@ type Tarefa = {
   icone: string | null;
 };
 
-type Crianca = { id: string; name: string };
+type Crianca = { id: string; name: string; icon?: string | null };
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
 type DescontoItem = {
   id: string;
@@ -58,6 +59,7 @@ export default function ResponsavelDashboard({
   hojeISO,
   eventosSemanaTodos,
   atrasadas,
+  resumoFeitas,
   descontosEventos,
   descontosAjustes,
   revisarEventos,
@@ -74,6 +76,7 @@ export default function ResponsavelDashboard({
   hojeISO: string;
   eventosSemanaTodos: EventoSemana[];
   atrasadas: Atrasada[];
+  resumoFeitas: Record<string, ResumoFeitas>;
   descontosEventos: DescontoItem[];
   descontosAjustes: DescontoItem[];
   revisarEventos: RevisarItem[];
@@ -99,6 +102,8 @@ export default function ResponsavelDashboard({
               nivelBadge={<NivelBadge info={nivelPorPerfil[c.id]} />}
             />
           ))}
+
+          <ResumoFeitasCard criancas={criancas} resumo={resumoFeitas} />
 
           <h2 className="text-lg font-semibold mt-6">Aguardando confirmação/autorização</h2>
           <p className="text-sm text-slate-400 mb-3">

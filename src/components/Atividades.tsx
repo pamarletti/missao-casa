@@ -6,6 +6,7 @@ export type AtividadeItem = {
   id: string;
   quando: string; // ISO date/timestamp
   quemNome?: string;
+  profileId?: string;
   descricao: string;
   valor: number;
   statusLabel: string;

@@ -4,28 +4,43 @@ import { useState } from "react";
 import SaldoCard from "@/components/SaldoCard";
 import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
 import TabBar from "@/components/TabBar";
-import Atividades, { type AtividadeItem } from "@/components/Atividades";
+import { type AtividadeItem } from "@/components/Atividades";
+import PendenciasTab from "@/components/PendenciasTab";
+import DescontosPorDiaTab from "@/components/DescontosPorDiaTab";
+import RevisarTarefasTab from "@/components/RevisarTarefasTab";
+import CatalogoEditavelTab from "@/components/CatalogoEditavelTab";
+import HistoricoPorPerfilTab from "@/components/HistoricoPorPerfilTab";
 
 type Tarefa = {
   id: string;
   name: string;
   categoria: "individual" | "individual_coletiva" | "coletiva";
   subcategoria: string | null;
+  frequencia: string;
   valor_unitario: number;
+  ocorrencias_por_dia: number;
+  icone: string | null;
 };
 
 type Crianca = { id: string; name: string };
-
-const CATEGORIA_LABEL: Record<string, string> = {
-  individual: "Tarefas individuais",
-  individual_coletiva: "Tarefas do quarto (individual-coletivas)",
-  coletiva: "Tarefas coletivas",
+type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
+type DescontoItem = {
+  id: string;
+  data: string;
+  valor: number;
+  profileId: string;
+  profileName: string;
+  descricao: string;
 };
+type RevisarItem = { id: string; data: string; status: string; valor: number; profileName: string; descricao: string };
 
 const TABS = [
   { key: "inicio", label: "Início" },
-  { key: "catalogo", label: "Catálogo" },
-  { key: "atividades", label: "Histórico de Atividades" },
+  { key: "pendencias", label: "Pendências" },
+  { key: "descontos", label: "Descontos por dia" },
+  { key: "revisar", label: "Revisar tarefas" },
+  { key: "catalogo", label: "Catálogo editável" },
+  { key: "historico", label: "Histórico por perfil" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -37,6 +52,12 @@ export default function ResponsavelDashboard({
   pending,
   catalog,
   atividades,
+  hojeISO,
+  eventosSemanaTodos,
+  descontosEventos,
+  descontosAjustes,
+  revisarEventos,
+  revisarCount,
 }: {
   familyId: string;
   criancas: Crianca[];
@@ -44,15 +65,14 @@ export default function ResponsavelDashboard({
   pending: PendingEvent[];
   catalog: Tarefa[];
   atividades: AtividadeItem[];
+  hojeISO: string;
+  eventosSemanaTodos: EventoSemana[];
+  descontosEventos: DescontoItem[];
+  descontosAjustes: DescontoItem[];
+  revisarEventos: RevisarItem[];
+  revisarCount: number;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
-
-  const grupos = new Map<string, Tarefa[]>();
-  for (const t of catalog) {
-    const chave = CATEGORIA_LABEL[t.categoria] ?? t.categoria;
-    if (!grupos.has(chave)) grupos.set(chave, []);
-    grupos.get(chave)!.push(t);
-  }
 
   return (
     <div>
@@ -80,25 +100,23 @@ export default function ResponsavelDashboard({
         </>
       )}
 
-      {tab === "catalogo" && (
-        <>
-          {Array.from(grupos.entries()).map(([titulo, tarefas]) => (
-            <section key={titulo} className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
-              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {tarefas.map((t) => (
-                  <li key={t.id} className="card p-3 flex flex-col items-center text-center gap-1">
-                    <p className="font-medium text-sm leading-tight">{t.name}</p>
-                    <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </>
+      {tab === "pendencias" && (
+        <PendenciasTab
+          familyId={familyId}
+          criancas={criancas}
+          catalog={catalog}
+          eventos={eventosSemanaTodos}
+          hojeISO={hojeISO}
+        />
       )}
 
-      {tab === "atividades" && <Atividades itens={atividades} permitirDesfazer />}
+      {tab === "descontos" && <DescontosPorDiaTab eventos={descontosEventos} ajustes={descontosAjustes} />}
+
+      {tab === "revisar" && <RevisarTarefasTab eventos={revisarEventos} count={revisarCount} />}
+
+      {tab === "catalogo" && <CatalogoEditavelTab catalog={catalog} />}
+
+      {tab === "historico" && <HistoricoPorPerfilTab criancas={criancas} atividades={atividades} />}
     </div>
   );
 }

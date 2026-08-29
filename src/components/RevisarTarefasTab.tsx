@@ -1,0 +1,56 @@
+"use client";
+
+import { decidir, desfazerEvento } from "@/app/app/[profileId]/actions";
+
+type Item = { id: string; data: string; status: string; valor: number; profileName: string; descricao: string };
+
+const STATUS_LABEL: Record<string, string> = {
+  confirmado: "confirmado",
+  liberada: "liberada (autorizada)",
+};
+
+/** Revisar tarefas — número absoluto de registros confirmados/autorizados
+ * e a lista completa, com botões para marcar, desmarcar ou corrigir
+ * qualquer tarefa já registrada. */
+export default function RevisarTarefasTab({ eventos, count }: { eventos: Item[]; count: number }) {
+  return (
+    <div>
+      <div className="card mb-4 text-center">
+        <p className="text-3xl font-bold text-casa-accent">{count}</p>
+        <p className="text-sm text-slate-400">registros confirmados/autorizados no total</p>
+      </div>
+
+      {eventos.length === 0 ? (
+        <p className="text-slate-400 text-sm">Nada por aqui ainda.</p>
+      ) : (
+        <ul className="space-y-2">
+          {eventos.map((e) => (
+            <li key={e.id} className="card flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="font-medium">{e.descricao}</p>
+                <p className="text-sm text-slate-400">
+                  {e.profileName} · {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR")} · R${" "}
+                  {Number(e.valor).toFixed(2)} · {STATUS_LABEL[e.status] ?? e.status}
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button className="btn-primary text-xs" onClick={() => decidir(e.id, "confirmar")}>
+                  Confirmar
+                </button>
+                <button className="btn-secondary text-xs" onClick={() => decidir(e.id, "refazer")}>
+                  Refazer
+                </button>
+                <button className="btn-danger text-xs" onClick={() => decidir(e.id, "nao_feito")}>
+                  Não feito
+                </button>
+                <button className="text-xs text-slate-500 underline" onClick={() => desfazerEvento(e.id)}>
+                  excluir
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

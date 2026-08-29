@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { markOrRequest, markColetivaDone, cancelarPropriaMarcacao } from "@/app/app/[profileId]/actions";
 import { inicioDaJanela } from "@/lib/periodos";
+import { iconeTarefa } from "@/lib/iconeTarefa";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 
@@ -27,79 +28,6 @@ function formatTempoRestante(ms: number): string {
   return `${minutos}min`;
 }
 
-// Ícone (em vez de foto de verdade — mais leve e não depende de upload de
-// imagem) que representa cada tarefa, escolhido por palavras-chave no nome.
-// A ordem importa: frases mais específicas vêm antes das genéricas.
-const ICONES_POR_PALAVRA: [string, string][] = [
-  ["roupa de cama", "🛏️"],
-  ["cama", "🛏️"],
-  ["mochila", "🎒"],
-  ["sapato", "👟"],
-  ["toalha", "🧺"],
-  ["louça", "🍽️"],
-  ["prato", "🍽️"],
-  ["panela", "🍳"],
-  ["utensílio", "🍳"],
-  ["lixeira", "🗑️"],
-  ["lixo", "🗑️"],
-  ["reciclagem", "♻️"],
-  ["vaso sanitário", "🚽"],
-  ["box", "🚿"],
-  ["chuveiro", "🚿"],
-  ["banheiro", "🚽"],
-  ["pia", "🚰"],
-  ["geladeira", "🧊"],
-  ["fogão", "🍳"],
-  ["micro-ondas", "🍳"],
-  ["espelho", "🪞"],
-  ["janela", "🪟"],
-  ["interruptor", "💡"],
-  ["maçaneta", "🚪"],
-  ["pó dos móveis", "🧹"],
-  ["chão", "🧹"],
-  ["varrer", "🧹"],
-  ["mesa", "🍽️"],
-  ["café da manhã", "🍳"],
-  ["almoço", "🍲"],
-  ["jantar", "🍛"],
-  ["lanche", "🥪"],
-  ["cardápio", "📋"],
-  ["compras", "🛒"],
-  ["mercado", "🛒"],
-  ["feira", "🛒"],
-  ["despensa", "🗄️"],
-  ["armário", "🗄️"],
-  ["planta", "🪴"],
-  ["regar", "🪴"],
-  ["podar", "🪴"],
-  ["skate", "🛹"],
-  ["arejar", "🌬️"],
-  ["quarto", "🛏️"],
-  ["brinquedo", "🧸"],
-  ["estante", "📚"],
-  ["rack", "📺"],
-  ["remédio", "💊"],
-  ["primeiros socorros", "💊"],
-  ["ferramenta", "🧰"],
-  ["sala", "🛋️"],
-  ["área de serviço", "🧺"],
-  ["sabonete", "🧴"],
-  ["shampoo", "🧴"],
-  ["papel higiênico", "🧻"],
-  ["roupa", "👕"],
-  ["objeto", "📦"],
-];
-
-function iconeTarefa(t: { name: string; categoria: string }): string {
-  const chave = t.name.toLowerCase();
-  for (const [palavra, icone] of ICONES_POR_PALAVRA) {
-    if (chave.includes(palavra)) return icone;
-  }
-  if (t.categoria === "coletiva") return "🤝";
-  if (t.categoria === "individual_coletiva") return "🛏️";
-  return "✅";
-}
-
 type Tarefa = {
   id: string;
   name: string;
@@ -108,6 +36,7 @@ type Tarefa = {
   frequencia: string;
   valor_unitario: number;
   ocorrencias_por_dia: number;
+  icone: string | null;
 };
 
 type EventoMes = {

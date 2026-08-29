@@ -123,6 +123,73 @@ export async function desfazerAjuste(ajusteId: string) {
   revalidatePath(`/app/${active.profileId}`);
 }
 
+/** Um responsável registra diretamente o resultado de uma tarefa que nenhum
+ * menino marcou ainda — usado na aba de Pendências, sem precisar passar
+ * pelo fluxo normal de "menino marca → responsável confirma". */
+export async function registrarDireto(
+  taskId: string,
+  profileId: string,
+  familyId: string,
+  decisao: "feito" | "nao_feito"
+) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const supabase = createClient();
+  const { data: task } = await supabase
+    .from("task_catalog")
+    .select("valor_unitario")
+    .eq("id", taskId)
+    .single();
+  if (!task) return;
+
+  if (decisao === "feito") {
+    await supabase.from("task_events").insert({
+      family_id: familyId,
+      task_id: taskId,
+      profile_id: profileId,
+      status: "confirmado",
+      valor: task.valor_unitario,
+      origem: "responsavel",
+      confirmado_por: active.profileId,
+      confirmado_em: new Date().toISOString(),
+    });
+  } else {
+    await supabase.from("task_events").insert({
+      family_id: familyId,
+      task_id: taskId,
+      profile_id: profileId,
+      status: "nao_feito",
+      valor: 0,
+      origem: "responsavel",
+    });
+  }
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** Um responsável edita nome, valor ou ícone de uma tarefa do catálogo —
+ * vale a partir de agora, sem alterar valores de eventos já registrados. */
+export async function editarTarefa(formData: FormData) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const taskId = String(formData.get("taskId") || "");
+  const name = String(formData.get("name") || "").trim();
+  const valorInformado = Number(String(formData.get("valor_unitario") || "0").replace(",", "."));
+  const icone = String(formData.get("icone") || "").trim() || null;
+
+  if (!taskId || !name || !Number.isFinite(valorInformado) || valorInformado < 0) {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
+  const supabase = createClient();
+  await supabase.from("task_catalog").update({ name, valor_unitario: valorInformado, icone }).eq("id", taskId);
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
 /** Um responsável credita ou debita manualmente o saldo (mesada virtual)
  * de um menino — adiantamento, presente, correção de erro, etc. */
 export async function ajustarSaldo(formData: FormData) {

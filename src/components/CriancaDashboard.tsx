@@ -332,7 +332,7 @@ export default function CriancaDashboard({
           </div>
 
           <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">🙌 Tem um tempinho?</h2>
+            <h2 className="text-lg font-semibold mb-3">🙌 Tem um tempinho? Aí algumas sugestões:</h2>
             {sugestoesTempinho.length > 0 ? (
               <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {sugestoesTempinho.map((t) => (

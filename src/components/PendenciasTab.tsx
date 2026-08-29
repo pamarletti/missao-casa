@@ -132,11 +132,11 @@ export default function PendenciasTab({
                             ✗
                           </BotaoDireto>
                           <BotaoDireto
-                            className="btn-secondary text-xs px-2 py-0.5"
+                            className="btn bg-gray-600 text-slate-100 hover:bg-gray-500 text-xs px-2 py-0.5"
                             title="Pedir para refazer"
                             acao={() => decidir(evento.id, "refazer")}
                           >
-                            ↩
+                            ↺
                           </BotaoDireto>
                         </div>
                       ) : evento.status === "aguardando_autorizacao" ? (

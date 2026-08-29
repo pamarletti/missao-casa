@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { editarTarefa, definirValorBase } from "@/app/app/[profileId]/actions";
 import { valorMensalTotal } from "@/lib/valorBase";
+import CancelarContaButton from "@/components/CancelarContaButton";
 
 type Tarefa = {
   id: string;
@@ -169,6 +170,11 @@ export default function CatalogoEditavelTab({
           </ul>
         </section>
       ))}
+
+      <section className="mt-10 pt-6 border-t border-slate-700/60">
+        <h2 className="text-lg font-semibold mb-3 text-slate-400">Zona de perigo</h2>
+        <CancelarContaButton />
+      </section>
     </div>
   );
 }

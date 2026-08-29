@@ -3,13 +3,46 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getActiveProfile } from "@/lib/activeProfile";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveProfile, clearActiveProfile } from "@/lib/activeProfile";
 import { valorMensalTotal } from "@/lib/valorBase";
 
 async function requireActiveProfile() {
   const active = await getActiveProfile();
   if (!active) redirect("/app");
   return active;
+}
+
+/** Apaga a conta da família PARA SEMPRE: o login (usuário no Supabase
+ * Auth), a família, todos os perfis (responsáveis e crianças), o catálogo
+ * de tarefas, todo o histórico de eventos/ajustes e fechamentos. Todas as
+ * tabelas têm `on delete cascade` até `auth.users` (ver supabase/schema.sql
+ * e 002_saldo_ajustes.sql), então apagar o usuário de login já é
+ * suficiente — o Postgres cuida do resto em cascata numa única operação
+ * atômica. Só o responsável pode chamar isso, e só depois de confirmar na
+ * tela (CancelarContaButton exige digitar "cancelar"). Ação irreversível:
+ * não existe "desfazer" nem backup automático.
+ */
+export async function cancelarContaFamilia() {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.deleteUser(user.id);
+  if (error) {
+    console.error("Erro ao cancelar conta da família:", error.message);
+    return;
+  }
+
+  await clearActiveProfile();
+  await supabase.auth.signOut();
+  redirect("/login?contaCancelada=1");
 }
 
 /** Menino marca uma tarefa individual/individual-coletiva como feita,

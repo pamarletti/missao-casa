@@ -4,7 +4,7 @@ import { login } from "./actions";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: { erro?: string };
+  searchParams: { erro?: string; contaCancelada?: string };
 }) {
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
@@ -14,6 +14,12 @@ export default function LoginPage({
           Entre com a conta da família (o e-mail e senha que o responsável
           cadastrou).
         </p>
+
+        {searchParams.contaCancelada && (
+          <p className="text-green-400 text-sm text-center">
+            A conta da família foi cancelada e todos os dados foram apagados.
+          </p>
+        )}
 
         {searchParams.erro && (
           <p className="text-red-400 text-sm text-center">{searchParams.erro}</p>

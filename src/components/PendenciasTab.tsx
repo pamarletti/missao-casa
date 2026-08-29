@@ -78,19 +78,19 @@ export default function PendenciasTab({
                     R$ {Number(tarefa.valor_unitario).toFixed(2)}
                   </span>
                 </div>
-                <ul className="space-y-1">
+                <ul className="divide-y divide-slate-700/60">
                   {porFilho.map(({ crianca, evento }) => (
-                    <li key={crianca.id} className="flex items-center justify-between gap-3">
+                    <li key={crianca.id} className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
                       <span className="text-sm">{crianca.name}</span>
                       {!evento ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                           <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "feito")}>
-                            <button className="btn-primary text-xs px-3 py-1" title="Marcar feito">
+                            <button className="btn-primary text-xs px-2 py-0.5" title="Marcar feito">
                               ✓
                             </button>
                           </form>
                           <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "nao_feito")}>
-                            <button className="btn-danger text-xs px-3 py-1" title="Marcar não feito">
+                            <button className="btn-danger text-xs px-2 py-0.5" title="Marcar não feito">
                               ✗
                             </button>
                           </form>

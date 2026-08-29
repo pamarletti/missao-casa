@@ -185,7 +185,7 @@ export default async function Dashboard({
     }));
 
     // Revisar tarefas: tudo que já está confirmado ou autorizado (liberada),
-    // com contagem total e lista pra corrigir qualquer registro.
+    // com contagem do dia de hoje e lista completa pra corrigir qualquer registro.
     const { data: revisarEventosRaw, error: revisarError } = await supabase
       .from("task_events")
       .select("id, data, status, valor, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
@@ -199,6 +199,7 @@ export default async function Dashboard({
       .from("task_events")
       .select("id", { count: "exact", head: true })
       .eq("family_id", familyId)
+      .eq("data", today)
       .in("status", ["confirmado", "liberada"]);
     if (revisarCountError) console.error("Erro ao contar tarefas revisáveis:", revisarCountError.message);
 

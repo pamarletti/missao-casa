@@ -213,6 +213,7 @@ export default function CriancaDashboard({
   const pendentesProprios = eventosMes.filter((e) =>
     ["aguardando_autorizacao", "aguardando_confirmacao"].includes(e.status)
   );
+  const valorPendente = pendentesProprios.reduce((acc, e) => acc + Number(e.valor), 0);
 
   // Progresso e projeção: quanto dá pra ganhar fazendo tudo que é
   // obrigatório (individual + individual-coletiva — as coletivas são
@@ -332,7 +333,7 @@ export default function CriancaDashboard({
           </div>
 
           <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">🙌 Tem um tempinho? Aí algumas sugestões:</h2>
+            <h2 className="text-lg font-semibold mb-3">🙌 Tem um tempinho? Aí vão algumas sugestões:</h2>
             {sugestoesTempinho.length > 0 ? (
               <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {sugestoesTempinho.map((t) => (
@@ -464,9 +465,16 @@ export default function CriancaDashboard({
             </div>
           </div>
 
-          {pendentesProprios.length > 0 && (
-            <section className="mb-6">
-              <h2 className="text-lg font-semibold mb-3">Esperando decisão</h2>
+          <section className="mb-6">
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <h2 className="text-lg font-semibold">Confirmações e autorizações pendentes</h2>
+              {pendentesProprios.length > 0 && (
+                <span className="text-sm font-semibold text-amber-400 shrink-0">
+                  R$ {valorPendente.toFixed(2)} pendente
+                </span>
+              )}
+            </div>
+            {pendentesProprios.length > 0 ? (
               <ul className="space-y-2">
                 {pendentesProprios.map((e) => {
                   const tarefa = catalog.find((t) => t.id === e.task_id);
@@ -489,8 +497,10 @@ export default function CriancaDashboard({
                   );
                 })}
               </ul>
-            </section>
-          )}
+            ) : (
+              <p className="text-sm text-green-400">Tudo confirmado e autorizado por aqui! ✓</p>
+            )}
+          </section>
         </>
       )}
 

@@ -9,15 +9,15 @@ const STATUS_LABEL: Record<string, string> = {
   liberada: "liberada (autorizada)",
 };
 
-/** Revisar tarefas — número absoluto de registros confirmados/autorizados
- * e a lista completa, com botões para marcar, desmarcar ou corrigir
- * qualquer tarefa já registrada. */
+/** Revisar tarefas — número de registros confirmados/autorizados no dia
+ * de hoje, e a lista completa, com botões para marcar, desmarcar ou
+ * corrigir qualquer tarefa já registrada. */
 export default function RevisarTarefasTab({ eventos, count }: { eventos: Item[]; count: number }) {
   return (
     <div>
       <div className="card mb-4 text-center">
         <p className="text-3xl font-bold text-casa-accent">{count}</p>
-        <p className="text-sm text-slate-400">registros confirmados/autorizados no total</p>
+        <p className="text-sm text-slate-400">registros confirmados/autorizados hoje</p>
       </div>
 
       {eventos.length === 0 ? (

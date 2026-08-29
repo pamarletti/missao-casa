@@ -397,7 +397,7 @@ function Shell({
 }) {
   return (
     <main className="min-h-screen p-4 max-w-lg sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto">
-      <p className="text-center text-lg font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
+      <p className="text-center text-2xl font-bold text-slate-400 mb-1">🏠 Missão Casa</p>
       <header className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">{title}</h1>
         <div className="flex items-center gap-2">

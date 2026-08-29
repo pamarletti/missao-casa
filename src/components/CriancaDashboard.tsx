@@ -377,7 +377,7 @@ export default function CriancaDashboard({
 
             {(valorEmRiscoHoje > 0 || valorEmRiscoSemana > 0) && (
               <p className="text-xs text-slate-500 mt-3">
-                É o quanto você deixa de ganhar se essas tarefas obrigatórias continuarem sem marcar até o prazo.
+                É o quanto você deixa de ganhar se não fizer as tarefas obrigatórias até o prazo.
               </p>
             )}
           </div>

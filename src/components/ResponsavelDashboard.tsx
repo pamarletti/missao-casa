@@ -100,7 +100,10 @@ export default function ResponsavelDashboard({
             />
           ))}
 
-          <h2 className="text-lg font-semibold mb-3 mt-6">Pendências</h2>
+          <h2 className="text-lg font-semibold mt-6">Aguardando confirmação/autorização</h2>
+          <p className="text-sm text-slate-400 mb-3">
+            Não esqueça de conferir se a tarefa foi feita... e bem feita. Talvez tenha algo que precise ser ensinado.
+          </p>
           <ConfirmQueue familyId={familyId} events={pending} />
         </>
       )}

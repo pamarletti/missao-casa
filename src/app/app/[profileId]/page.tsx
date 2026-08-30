@@ -105,19 +105,23 @@ export default async function Dashboard({
       saldoPorPerfil[a.profile_id] = (saldoPorPerfil[a.profile_id] ?? 0) + Number(a.valor);
     }
 
+    // Traz o catálogo INTEIRO, inclusive as tarefas desligadas
+    // ("desnecessárias") — só o Catálogo editável usa as desligadas, pra
+    // poder listar e religar. Todo o resto trabalha com catalogoAtivo.
     const { data: catalogoFamilia } = await supabase
       .from("task_catalog")
       .select(
         "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo"
       )
       .eq("family_id", familyId)
-      .eq("ativo", true)
       .order("categoria");
+
+    const catalogoAtivo = (catalogoFamilia ?? []).filter((t) => t.ativo);
 
     // Nível de constância (só visual/motivacional — ver src/lib/nivelConstancia.ts):
     // % líquido das tarefas obrigatórias (individual + individual-coletiva)
     // cumprido por cada criança nos últimos 30 dias corridos.
-    const obrigatoriasCatalogo = (catalogoFamilia ?? []).filter(
+    const obrigatoriasCatalogo = catalogoAtivo.filter(
       (t) => t.categoria === "individual" || t.categoria === "individual_coletiva"
     );
     const obrigatoriasIds = obrigatoriasCatalogo.map((t) => t.id);
@@ -293,7 +297,8 @@ export default async function Dashboard({
           criancas={criancas ?? []}
           saldoPorPerfil={saldoPorPerfil}
           pending={(pending ?? []) as unknown as PendingEvent[]}
-          catalog={catalogoFamilia ?? []}
+          catalog={catalogoAtivo}
+          catalogoCompleto={catalogoFamilia ?? []}
           atividades={atividades}
           hojeISO={today}
           eventosSemanaTodos={eventosSemanaTodos ?? []}

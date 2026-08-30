@@ -22,6 +22,7 @@ type Tarefa = {
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
   icone: string | null;
+  ativo: boolean;
 };
 
 type Crianca = { id: string; name: string; icon?: string | null };
@@ -41,6 +42,7 @@ export default function ResponsavelDashboard({
   saldoPorPerfil,
   pending,
   catalog,
+  catalogoCompleto,
   atividades,
   hojeISO,
   eventosSemanaTodos,
@@ -53,7 +55,10 @@ export default function ResponsavelDashboard({
   criancas: Crianca[];
   saldoPorPerfil: Record<string, number>;
   pending: PendingEvent[];
+  /** Só as tarefas ligadas — é o que os meninos veem e o que entra em Pendências. */
   catalog: Tarefa[];
+  /** Inclui também as desligadas ("desnecessárias"), só pro Catálogo editável. */
+  catalogoCompleto: Tarefa[];
   atividades: AtividadeItem[];
   hojeISO: string;
   eventosSemanaTodos: EventoSemana[];
@@ -106,7 +111,7 @@ export default function ResponsavelDashboard({
 
 
       {tab === "catalogo" && (
-        <CatalogoEditavelTab catalog={catalog} familyId={familyId} valorBaseAtual={valorBaseObrigatorias} />
+        <CatalogoEditavelTab catalog={catalogoCompleto} familyId={familyId} valorBaseAtual={valorBaseObrigatorias} />
       )}
 
       {tab === "historico" && <HistoricoPorPerfilTab criancas={criancas} atividades={atividades} />}

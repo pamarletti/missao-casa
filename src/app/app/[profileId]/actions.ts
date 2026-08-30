@@ -277,6 +277,49 @@ export async function registrarAtrasada(
  * o "valor base" da família (o total mensal que ela representa) é
  * recalculado automaticamente para refletir essa edição — sem mexer no
  * valor das outras tarefas. */
+/** Liga/desliga uma tarefa do catálogo da família ("desnecessária
+ * temporariamente"). Uma tarefa desligada some das listas de Hoje / Esta
+ * semana / Coletivas dos meninos e da fila de Pendências do responsável,
+ * mas continua existindo no banco (`ativo = false`, nunca excluída) — o
+ * histórico do que já foi feito com ela fica intacto, e dá pra religar a
+ * qualquer momento pelo bloco "Tarefas desnecessárias" do catálogo
+ * editável.
+ *
+ * Como o valor base mensal da família é a soma das obrigatórias ATIVAS,
+ * ligar/desligar uma obrigatória recalcula esse total — mesma regra de
+ * editarTarefa: os valores das outras tarefas não mudam, só o total passa
+ * a refletir o que está valendo de verdade. */
+export async function marcarDesnecessaria(taskId: string, desnecessaria: boolean) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+
+  const supabase = createClient();
+  await supabase.from("task_catalog").update({ ativo: !desnecessaria }).eq("id", taskId);
+
+  const { data: tarefa } = await supabase
+    .from("task_catalog")
+    .select("family_id, categoria")
+    .eq("id", taskId)
+    .single();
+
+  if (tarefa && (tarefa.categoria === "individual" || tarefa.categoria === "individual_coletiva")) {
+    const { data: obrigatorias } = await supabase
+      .from("task_catalog")
+      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")
+      .eq("family_id", tarefa.family_id)
+      .in("categoria", ["individual", "individual_coletiva"])
+      .eq("ativo", true);
+
+    const novoTotal = valorMensalTotal(obrigatorias ?? []);
+    await supabase
+      .from("families")
+      .update({ valor_base_obrigatorias: Math.round(novoTotal * 100) / 100 })
+      .eq("id", tarefa.family_id);
+  }
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
 export async function editarTarefa(formData: FormData) {
   const active = await requireActiveProfile();
   if (active.kind !== "responsavel") return;

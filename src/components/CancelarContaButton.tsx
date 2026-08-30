@@ -4,17 +4,22 @@ import { useState } from "react";
 import { cancelarContaFamilia } from "@/app/app/[profileId]/actions";
 import { BotaoAcao } from "@/components/Carregando";
 
-/** Zona de perigo do responsável: apaga a conta da família inteira, para
- * sempre (login, perfis, catálogo, histórico e saldo de todo mundo). Exige
- * digitar "cancelar" antes de habilitar o botão final, pra evitar clique
- * acidental numa ação que não tem volta. */
+/** Apaga a conta da família inteira, para sempre. Fica no menu do topo, na
+ * última posição (abaixo de "sair") e em vermelho, pra ser encontrável sem
+ * ser confundida com as ações do dia a dia. Abre em linha dentro do menu,
+ * e exige digitar "cancelar" antes de liberar o botão final — clique
+ * acidental numa ação sem volta não pode ser possível. */
 export default function CancelarContaButton() {
   const [aberto, setAberto] = useState(false);
   const [confirmacao, setConfirmacao] = useState("");
 
   if (!aberto) {
     return (
-      <button type="button" className="text-xs text-red-500/80 underline" onClick={() => setAberto(true)}>
+      <button
+        type="button"
+        className="text-sm text-red-500 hover:text-red-400 w-full text-left"
+        onClick={() => setAberto(true)}
+      >
         cancelar conta da família
       </button>
     );
@@ -23,44 +28,43 @@ export default function CancelarContaButton() {
   const habilitado = confirmacao.trim().toLowerCase() === "cancelar";
 
   return (
-    <div className="card border border-red-500/40 space-y-3 max-w-md">
+    <div className="space-y-2">
       <p className="text-sm font-semibold text-red-400">⚠️ Isso é irreversível</p>
-      <p className="text-sm text-slate-300">
-        Ao confirmar, a conta da família é apagada para sempre: o login, todos os perfis
-        (responsáveis e crianças), o catálogo de tarefas, todo o histórico de atividades e o saldo
-        acumulado de cada menino. Não tem como desfazer nem recuperar depois.
+      <p className="text-xs text-slate-300">
+        Apaga para sempre o login, todos os perfis, o catálogo, todo o histórico e o saldo acumulado de cada menino.
+        Não tem como desfazer.
       </p>
       <label className="block text-xs text-slate-400">
-        Para confirmar, digite <span className="font-mono text-slate-300">cancelar</span> abaixo:
+        Digite <span className="font-mono text-slate-200">cancelar</span> para confirmar:
         <input
           type="text"
           value={confirmacao}
           onChange={(e) => setConfirmacao(e.target.value)}
-          placeholder="digite: cancelar"
-          className="mt-1"
+          placeholder="cancelar"
+          className="mt-1 text-sm"
         />
       </label>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className="btn-secondary text-sm"
-          onClick={() => {
-            setAberto(false);
-            setConfirmacao("");
-          }}
+
+      <form action={cancelarContaFamilia}>
+        <BotaoAcao
+          className="btn-danger text-xs w-full disabled:opacity-40"
+          disabled={!habilitado}
+          carregando="cancelando…"
         >
-          Voltar
-        </button>
-        <form action={cancelarContaFamilia}>
-          <BotaoAcao
-            className="btn-danger text-sm disabled:opacity-40"
-            disabled={!habilitado}
-            carregando="cancelando…"
-          >
-            Sim, cancelar conta definitivamente
-          </BotaoAcao>
-        </form>
-      </div>
+          Sim, cancelar conta definitivamente
+        </BotaoAcao>
+      </form>
+
+      <button
+        type="button"
+        className="text-xs text-slate-400 underline w-full text-left"
+        onClick={() => {
+          setAberto(false);
+          setConfirmacao("");
+        }}
+      >
+        voltar
+      </button>
     </div>
   );
 }

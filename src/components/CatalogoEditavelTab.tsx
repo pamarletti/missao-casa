@@ -4,7 +4,6 @@ import { useState } from "react";
 import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[profileId]/actions";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalTotal } from "@/lib/valorBase";
-import CancelarContaButton from "@/components/CancelarContaButton";
 import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
@@ -268,10 +267,6 @@ export default function CatalogoEditavelTab({
         )}
       </SecaoExpansivel>
 
-      <section className="mt-10 pt-6 border-t border-slate-700/60">
-        <h2 className="text-lg font-semibold mb-3 text-slate-400">Zona de perigo</h2>
-        <CancelarContaButton />
-      </section>
     </div>
   );
 }

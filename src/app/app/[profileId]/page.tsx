@@ -18,6 +18,7 @@ import type { ResumoFeitas } from "@/components/ResumoFeitasCard";
 import type { TotaisAtividades } from "@/components/TotaisAtividades";
 import { BotaoAcao } from "@/components/Carregando";
 import MenuPerfil, { ItemMenu } from "@/components/MenuPerfil";
+import CancelarContaButton from "@/components/CancelarContaButton";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica usada
 // no antigo cron de desconto automático, agora substituído por decisão
@@ -283,6 +284,7 @@ export default async function Dashboard({
         onLogout={logout}
         onTrocarPerfil={trocarPerfil}
         pinButton={<MudarPinButton profileId={profile.id} />}
+        cancelarContaButton={<CancelarContaButton />}
         emojiButton={<EmojiButton profileId={profile.id} iconeAtual={profile.icon} />}
         mensagemPin={
           searchParams.erroPin
@@ -486,6 +488,7 @@ function Shell({
   onTrocarPerfil,
   pinButton,
   emojiButton,
+  cancelarContaButton,
   mensagemPin,
   nivelBadge,
 }: {
@@ -495,6 +498,8 @@ function Shell({
   onTrocarPerfil: () => void;
   pinButton?: React.ReactNode;
   emojiButton?: React.ReactNode;
+  /** Só o responsável recebe — fica por último no menu, em vermelho. */
+  cancelarContaButton?: React.ReactNode;
   mensagemPin?: { texto: string; tipo: "erro" | "sucesso" };
   nivelBadge?: React.ReactNode;
 }) {
@@ -515,11 +520,12 @@ function Shell({
           </ItemMenu>
           <ItemMenu>
             <form action={onLogout}>
-              <BotaoAcao className="text-sm text-red-400 hover:text-red-300 w-full text-left" carregando="saindo…">
+              <BotaoAcao className="text-sm text-slate-300 hover:text-white w-full text-left" carregando="saindo…">
                 sair
               </BotaoAcao>
             </form>
           </ItemMenu>
+          {cancelarContaButton && <ItemMenu>{cancelarContaButton}</ItemMenu>}
         </MenuPerfil>
       </header>
 

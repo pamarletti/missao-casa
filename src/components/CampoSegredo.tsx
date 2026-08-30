@@ -129,49 +129,54 @@ function CampoPin({
   return (
     <div>
       <input type="hidden" name={name} value={valor} />
-      {/* `relative` para o olho poder ficar por cima da última caixa, em
-          vez de ocupar uma coluna só dele ao lado da fileira. */}
-      <div className="relative inline-flex items-center gap-1.5" role="group" aria-label={placeholder}>
-        {digitos.map((d, i) => (
-          <input
-            key={i}
-            ref={(el) => {
-              caixas.current[i] = el;
-              if (i === 0 && refCampo) {
-                (refCampo as React.MutableRefObject<HTMLInputElement | null>).current = el;
-              }
-            }}
-            type="text"
-            inputMode="numeric"
-            // Marca de campo de código de verificação. Alguns gerenciadores
-            // de senha usam justamente isso pra pular o campo; a colagem de
-            // vários dígitos de uma vez continua funcionando, porque quem
-            // distribui os números pelas caixas é o onChange, não o campo.
-            maxLength={1}
-            autoComplete="off"
-            data-1p-ignore="true"
-            data-lpignore="true"
-            data-bwignore="true"
-            data-form-type="other"
-            aria-label={`${i + 1}º número de ${tamanho}`}
-            autoFocus={autoFocus && i === 0}
-            value={d ? (visivel ? d : "•") : ""}
-            onChange={(e) => escrever(i, e.target.value)}
-            onKeyDown={(e) => aoTeclar(i, e)}
-            onFocus={(e) => e.target.select()}
-            className="w-9 h-9 text-center text-sm rounded-lg px-0 py-0"
-          />
-        ))}
+      {/* O olho fica ACIMA da fileira, alinhado à direita — ou seja, em
+          cima da última caixa, sem invadir o espaço do dígito. Uma coluna
+          simples resolve: nada de posicionamento absoluto, e a linha do
+          ícone reserva a própria altura. */}
+      <div className="inline-flex flex-col items-end gap-1">
         <button
           type="button"
           onClick={() => setVisivel((v) => !v)}
           aria-label={visivel ? "Esconder" : "Mostrar"}
           title={visivel ? "Esconder" : "Mostrar"}
           aria-pressed={visivel}
-          className="absolute right-1 top-1/2 -translate-y-1/2 p-0 text-slate-500 hover:text-slate-200 transition"
+          className="mr-1 p-0 text-slate-500 hover:text-slate-200 transition"
         >
           <Olho aberto={visivel} pequeno />
         </button>
+
+        <div className="flex items-center gap-1.5" role="group" aria-label={placeholder}>
+          {digitos.map((d, i) => (
+            <input
+              key={i}
+              ref={(el) => {
+                caixas.current[i] = el;
+                if (i === 0 && refCampo) {
+                  (refCampo as React.MutableRefObject<HTMLInputElement | null>).current = el;
+                }
+              }}
+              type="text"
+              inputMode="numeric"
+              // Marca de campo de código de verificação. Alguns gerenciadores
+              // de senha usam justamente isso pra pular o campo; a colagem de
+              // vários dígitos de uma vez continua funcionando, porque quem
+              // distribui os números pelas caixas é o onChange, não o campo.
+              maxLength={1}
+              autoComplete="off"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-bwignore="true"
+              data-form-type="other"
+              aria-label={`${i + 1}º número de ${tamanho}`}
+              autoFocus={autoFocus && i === 0}
+              value={d ? (visivel ? d : "•") : ""}
+              onChange={(e) => escrever(i, e.target.value)}
+              onKeyDown={(e) => aoTeclar(i, e)}
+              onFocus={(e) => e.target.select()}
+              className="w-9 h-9 text-center text-sm rounded-lg px-0 py-0"
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

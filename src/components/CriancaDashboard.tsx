@@ -85,14 +85,21 @@ const ORDEM_CATEGORIA: Record<string, number> = {
 
 const TABS = [
   { key: "inicio", label: "Início" },
-  { key: "hoje", label: "Hoje" },
-  { key: "semana", label: "Esta semana" },
+  { key: "obrigatorias", label: "Obrigatórias" },
   { key: "coletivas", label: "Bônus" },
   { key: "catalogo", label: "Catálogo Completo" },
   { key: "atividades", label: "Histórico de Atividades" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+/** Dentro da aba Obrigatórias, o menino escolhe o prazo que quer ver. */
+const PERIODOS = [
+  { key: "hoje", label: "Hoje" },
+  { key: "semana", label: "Esta semana" },
+] as const;
+
+type PeriodoKey = (typeof PERIODOS)[number]["key"];
 
 /** Frase curta no topo de cada aba, explicando pro menino o que ele está
  * vendo ali. A aba Início não tem — os próprios cards já se explicam. */
@@ -201,6 +208,7 @@ export default function CriancaDashboard({
   pedidos: PedidoDeTroca[];
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
+  const [periodo, setPeriodo] = useState<PeriodoKey>("hoje");
 
   // Só os pedidos do período corrente de cada tarefa: a consulta traz uma
   // janela larga (pra pegar semanais e mensais de uma vez), então o que
@@ -854,30 +862,47 @@ export default function CriancaDashboard({
         </>
       )}
 
-      {tab === "hoje" && (
+      {tab === "obrigatorias" && (
         <>
-          <TextoDaAba>Essas são suas tarefas obrigatórias para fazer ainda hoje.</TextoDaAba>
+          <TextoDaAba>
+            {periodo === "hoje"
+              ? "Essas são suas tarefas obrigatórias para fazer ainda hoje."
+              : "Essas são suas tarefas obrigatórias para fazer até o fim da semana."}
+          </TextoDaAba>
+
+          <div className="mb-4">
+            <p className="text-xs text-slate-400 mb-2">Para fazer:</p>
+            <div className="flex flex-wrap gap-2">
+              {PERIODOS.map((op) => (
+                <button
+                  key={op.key}
+                  type="button"
+                  onClick={() => setPeriodo(op.key)}
+                  aria-pressed={periodo === op.key}
+                  className={
+                    "text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition " +
+                    (periodo === op.key
+                      ? "bg-casa-accent text-slate-900 font-semibold"
+                      : "bg-slate-700 text-slate-300 hover:bg-slate-600")
+                  }
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <Catalogo
             tarefas={catalog.filter(
               (t) =>
                 ehObrigatoria(t) &&
                 (ehMinhaVez(t) || passeiAdiante(t)) &&
-                t.frequencia === "diaria" &&
-                !(t.pula_fim_de_semana && ehSextaOuSabado)
+                t.frequencia === (periodo === "hoje" ? "diaria" : "semanal") &&
+                // Sexta e sábado não têm aula no dia seguinte: mochila e
+                // roupa da escola não valem nesses dias.
+                !(periodo === "hoje" && t.pula_fim_de_semana && ehSextaOuSabado)
             )}
-            aba="hoje"
-          />
-        </>
-      )}
-
-      {tab === "semana" && (
-        <>
-          <TextoDaAba>Essas são suas tarefas obrigatórias para fazer até o fim da semana.</TextoDaAba>
-          <Catalogo
-            tarefas={catalog.filter(
-              (t) => ehObrigatoria(t) && (ehMinhaVez(t) || passeiAdiante(t)) && t.frequencia === "semanal"
-            )}
-            aba="semana"
+            aba={`obrigatorias:${periodo}`}
           />
         </>
       )}

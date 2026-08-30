@@ -1,10 +1,10 @@
 "use client";
 
 import { registrarDireto, registrarAtrasada, decidir } from "@/app/app/[profileId]/actions";
-import { inicioDaJanela } from "@/lib/periodos";
+import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
-import { valeParaCrianca } from "@/lib/dimensoes";
+import { valeParaCrianca, ehAVezDaCrianca } from "@/lib/dimensoes";
 
 type Tarefa = {
   id: string;
@@ -14,6 +14,7 @@ type Tarefa = {
   ocorrencias_por_dia: number;
   valor_unitario: number;
   icone: string | null;
+  finalidade: string | null;
   /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
   profile_ids: string[] | null;
 };
@@ -74,6 +75,8 @@ export default function PendenciasTab({
   atrasadas: Atrasada[];
 }) {
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
+  // Mesma ordem usada no servidor, pra o rodízio bater entre as telas.
+  const idsDasCriancas = criancas.map((c) => c.id);
 
   /** Situação de uma tarefa para uma criança, nesta janela.
    *
@@ -106,7 +109,11 @@ export default function PendenciasTab({
       .map((t) => ({
         tarefa: t,
         porFilho: criancas
-          .filter((c) => valeParaCrianca(t, c.id))
+          .filter(
+            (c) =>
+              valeParaCrianca(t, c.id) &&
+              ehAVezDaCrianca(t, c.id, idsDasCriancas, hojeISO, inicioDaSemana)
+          )
           .map((c) => ({ crianca: c, situacao: situacaoDoFilho(t, c.id) })),
       }))
       .filter((linha) => linha.porFilho.some((pf) => pf.situacao.vagas > 0 || pf.situacao.esperando));

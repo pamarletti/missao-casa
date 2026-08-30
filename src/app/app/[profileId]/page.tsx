@@ -12,7 +12,7 @@ import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
-import { valeParaCrianca } from "@/lib/dimensoes";
+import { valeParaCrianca, ehAVezDaCrianca } from "@/lib/dimensoes";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
 import type { ResumoFeitas } from "@/components/ResumoFeitasCard";
@@ -124,6 +124,8 @@ export default async function Dashboard({
     // Nível de constância (só visual/motivacional — ver src/lib/nivelConstancia.ts):
     // % líquido das tarefas obrigatórias (individual + individual-coletiva)
     // cumprido por cada criança nos últimos 30 dias corridos.
+    const idsDasCriancas = (criancas ?? []).map((c) => c.id);
+
     const obrigatoriasCatalogo = catalogoAtivo.filter(
       (t) => t.categoria === "individual" || t.categoria === "individual_coletiva"
     );
@@ -219,6 +221,8 @@ export default async function Dashboard({
         const eraSextaOuSabado = diaDaSemana === 5 || diaDaSemana === 6;
         for (const tarefa of diariasObrigatorias) {
           if (!valeParaCrianca(tarefa, crianca.id)) continue;
+          // Numa compartilhada, só cobra de quem era a vez NAQUELE dia.
+          if (!ehAVezDaCrianca(tarefa, crianca.id, idsDasCriancas, dia, inicioDaSemana)) continue;
           if (tarefa.pula_fim_de_semana && eraSextaOuSabado) continue;
           if (jaTemRegistroDiario.has(`${crianca.id}|${tarefa.id}|${dia}`)) continue;
           atrasadas.push({ data: dia, taskId: tarefa.id, profileId: crianca.id });
@@ -361,9 +365,21 @@ export default async function Dashboard({
     .order("data", { ascending: true });
   if (eventosMesError) console.error("Erro ao buscar eventos do mês:", eventosMesError.message);
 
-  // Tarefas compartilhadas podem valer só para algumas crianças; este menino
-  // só vê (e só é cobrado por) as que valem pra ele.
-  const catalogDoPerfil = (catalog ?? []).filter((t) => valeParaCrianca(t, profile.id));
+  // Ordem das crianças da família — a mesma em todas as telas, senão o
+  // rodízio das compartilhadas daria respostas diferentes em cada uma.
+  const { data: irmaosRaw } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("family_id", familyId)
+    .eq("kind", "crianca")
+    .order("name");
+  const idsDasCriancas = (irmaosRaw ?? []).map((p) => p.id);
+
+  // Este menino só vê (e só é cobrado por) o que vale pra ele — e, nas
+  // compartilhadas, só quando é a vez dele.
+  const catalogDoPerfil = (catalog ?? []).filter(
+    (t) => valeParaCrianca(t, profile.id) && ehAVezDaCrianca(t, profile.id, idsDasCriancas, today, inicioDaSemana)
+  );
 
   const eventos = eventosMes ?? [];
   const feitasMes = eventos.filter((e) => e.status === "confirmado").length;

@@ -80,3 +80,53 @@ export function valeParaCrianca(t: { profile_ids?: string[] | null }, profileId:
   if (!t.profile_ids || t.profile_ids.length === 0) return true;
   return t.profile_ids.includes(profileId);
 }
+
+/** Quem participa da tarefa, na ordem da lista de crianças da família (que
+ * vem ordenada por nome) — a ordem precisa ser a mesma em todo lugar, senão
+ * o rodízio daria respostas diferentes em cada tela. */
+export function participantes(
+  t: { profile_ids?: string[] | null },
+  todasAsCriancas: string[]
+): string[] {
+  if (!t.profile_ids || t.profile_ids.length === 0) return todasAsCriancas;
+  return todasAsCriancas.filter((id) => t.profile_ids!.includes(id));
+}
+
+/** Número do período a que a data pertence, contado desde sempre: muda de
+ * 1 em 1 a cada dia, semana ou mês, conforme a frequência da tarefa. É o
+ * que faz a vez virar sozinha, sem precisar guardar nada. */
+function indiceDoPeriodo(frequencia: string, dataISO: string, inicioDaSemanaISO: (d: string) => string): number {
+  const emDias = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+  };
+  if (frequencia === "mensal") {
+    const [y, m] = dataISO.split("-").map(Number);
+    return y * 12 + (m - 1);
+  }
+  if (frequencia === "semanal") return Math.floor(emDias(inicioDaSemanaISO(dataISO)) / 7);
+  return emDias(dataISO);
+}
+
+/** É a vez desta criança nesta data?
+ *
+ * O rodízio vale SÓ para tarefas de finalidade "Compartilhadas" — as que os
+ * meninos dividem de verdade (o quarto, o guarda-roupa). Tarefa "Para mim"
+ * é de cada um: os dois arrumam a própria cama todo dia, nada alterna. E
+ * tarefa de bônus é de quem quiser fazer.
+ *
+ * A vez vira junto com o período da própria tarefa: diária alterna a cada
+ * dia, semanal a cada segunda-feira, mensal a cada mês. */
+export function ehAVezDaCrianca(
+  t: { finalidade?: string | null; frequencia: string; profile_ids?: string[] | null },
+  profileId: string,
+  todasAsCriancas: string[],
+  dataISO: string,
+  inicioDaSemanaISO: (d: string) => string
+): boolean {
+  const participa = participantes(t, todasAsCriancas);
+  if (!participa.includes(profileId)) return false;
+  if (t.finalidade !== "Compartilhadas" || participa.length < 2) return true;
+  const i = indiceDoPeriodo(t.frequencia, dataISO, inicioDaSemanaISO) % participa.length;
+  return participa[i] === profileId;
+}

@@ -9,7 +9,7 @@ import MudarPinButton from "@/components/MudarPinButton";
 import EmojiButton from "@/components/EmojiButton";
 import type { PendingEvent } from "@/components/ConfirmQueue";
 import type { AtividadeItem } from "@/components/Atividades";
-import { inicioDoMes, inicioDaSemana, diasAtras } from "@/lib/periodos";
+import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
 import NivelBadge from "@/components/NivelBadge";
@@ -64,7 +64,7 @@ export default async function Dashboard({
   if (!profile) redirect("/app");
 
   const familyId = profile.family_id as string;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hojeEmRecife();
   const inicioMes = inicioDoMes(today);
 
   if (profile.kind === "responsavel") {
@@ -208,7 +208,7 @@ export default async function Dashboard({
 
     const atrasadas: Atrasada[] = [];
     for (const crianca of criancas ?? []) {
-      const criacaoISO = new Date(crianca.created_at).toISOString().slice(0, 10);
+      const criacaoISO = dataEmRecife(new Date(crianca.created_at));
       const inicioParaEssaCrianca = criacaoISO > inicioJanelaAtrasadas ? criacaoISO : inicioJanelaAtrasadas;
       for (let dia = inicioParaEssaCrianca; dia < today; dia = somaDiasISO(dia, 1)) {
         const diaDaSemana = diaDaSemanaISO(dia);

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveProfile, clearActiveProfile } from "@/lib/activeProfile";
 import { valorMensalTotal } from "@/lib/valorBase";
-import { inicioDaJanela } from "@/lib/periodos";
+import { inicioDaJanela, hojeEmRecife } from "@/lib/periodos";
 
 async function requireActiveProfile() {
   const active = await getActiveProfile();
@@ -62,8 +62,7 @@ async function eventoParaRefazer(
   profileId: string,
   frequencia: string
 ) {
-  const hoje = new Date().toISOString().slice(0, 10);
-  const janela = inicioDaJanela(frequencia, hoje);
+  const janela = inicioDaJanela(frequencia, hojeEmRecife());
 
   const { data } = await supabase
     .from("task_events")
@@ -109,6 +108,7 @@ export async function markOrRequest(taskId: string, familyId: string) {
       family_id: familyId,
       task_id: taskId,
       profile_id: active.profileId,
+      data: hojeEmRecife(),
       status,
       valor: task.valor_unitario,
       origem: "menino",
@@ -244,6 +244,7 @@ export async function registrarDireto(
         family_id: familyId,
         task_id: taskId,
         profile_id: profileId,
+        data: hojeEmRecife(),
         ...dadosFeito,
       });
     }
@@ -256,6 +257,7 @@ export async function registrarDireto(
       family_id: familyId,
       task_id: taskId,
       profile_id: profileId,
+      data: hojeEmRecife(),
       status: "nao_feito",
       valor: 0,
       origem: "responsavel",

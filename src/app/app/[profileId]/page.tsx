@@ -244,50 +244,40 @@ export default async function Dashboard({
       .in("task_id", obrigatoriasIds.length > 0 ? obrigatoriasIds : ["00000000-0000-0000-0000-000000000000"]);
     if (eventosRecentesError) console.error("Erro ao buscar eventos recentes:", eventosRecentesError.message);
 
-    // Desfechos que fecham a conta: creditaram ou descontaram de verdade.
-    const DESFECHOS = ["confirmado", "desconto_automatico"];
+    // Desfechos: uma tarefa com um destes já foi resolvida e sai da lista.
+    // "Desconsiderada" entra aqui junto com as outras duas: ela não mexe no
+    // saldo, mas encerra o assunto do mesmo jeito. O registro do que foi
+    // tirado do cálculo de propósito (dia de viagem, doença) fica no
+    // Histórico por perfil — que é também onde se desfaz, se for o caso.
+    // Deixar essas linhas nas Pendências só entulhava a lista, já que elas
+    // não pedem mais nenhuma decisão.
+    const DESFECHOS = ["confirmado", "desconto_automatico", "desconsiderada"];
 
     // Agrupa por período: o dia, nas diárias; a segunda-feira, nas semanais.
-    // "Desconsiderada" fica numa conta à parte: ela também resolve a
-    // pendência, mas sem mexer no saldo — e continua aparecendo na lista,
-    // marcada, pra ficar registrado o que foi tirado do cálculo de
-    // propósito (dia de viagem, doença) em vez de simplesmente sumir.
     const resolvidas = new Map<string, number>();
-    // Nas desconsideradas guardamos os ids, e não só a contagem: é o que
-    // permite desfazer a desconsideração direto da lista.
-    const desconsideradas = new Map<string, string[]>();
     const emAberto = new Map<string, string[]>();
     for (const e of eventosRecentesRaw ?? []) {
       const tarefa = obrigatoriasCatalogo.find((t) => t.id === e.task_id);
       if (!tarefa) continue;
       const periodo = tarefa.frequencia === "semanal" ? inicioDaSemana(e.data) : e.data;
       const chave = `${e.profile_id}|${e.task_id}|${periodo}`;
-      if (e.status === "desconsiderada") {
-        desconsideradas.set(chave, [...(desconsideradas.get(chave) ?? []), e.id]);
-      } else if (DESFECHOS.includes(e.status)) {
+      if (DESFECHOS.includes(e.status)) {
         resolvidas.set(chave, (resolvidas.get(chave) ?? 0) + 1);
       } else {
         emAberto.set(chave, [...(emAberto.get(chave) ?? []), e.status]);
       }
     }
 
-    /** Monta o item da lista, ou devolve null quando não há nada a mostrar.
-     * Sobrou vez por decidir? Vai com os três botões. Não sobrou, mas houve
-     * desconsideração? Vai só com a marca de "desconsiderado". */
+    /** Monta o item da lista, ou devolve null quando não sobrou nenhuma vez
+     * por decidir naquele período. */
     function montarAtrasada(
       chave: string,
       base: { data: string; taskId: string; profileId: string; frequencia: string },
       devidas: number
     ): Atrasada | null {
-      const ignoradas = desconsideradas.get(chave) ?? [];
-      const pendentes = devidas - (resolvidas.get(chave) ?? 0) - ignoradas.length;
-      if (pendentes > 0) {
-        return { ...base, pendentes, devidas, motivo: motivoDoAtraso(chave), eventos: [] };
-      }
-      if (ignoradas.length > 0) {
-        return { ...base, pendentes: 0, devidas, motivo: "desconsiderada", eventos: ignoradas };
-      }
-      return null;
+      const pendentes = devidas - (resolvidas.get(chave) ?? 0);
+      if (pendentes <= 0) return null;
+      return { ...base, pendentes, devidas, motivo: motivoDoAtraso(chave) };
     }
 
     /** Por que a tarefa está na lista — vira um rótulo na tela, pra o

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  registrarDireto,
-  registrarAtrasada,
-  decidir,
-  desfazerEvento,
-  reconsiderarAtrasada,
-} from "@/app/app/[profileId]/actions";
+import { registrarDireto, registrarAtrasada, decidir, desfazerEvento } from "@/app/app/[profileId]/actions";
 import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
@@ -49,19 +43,14 @@ export type Atrasada = {
   pendentes: number;
   /** Quantas vezes eram devidas no total (3, numa tarefa de 3× por dia). */
   devidas: number;
-  /** Por que caiu na lista — vira o rótulo mostrado ao lado da tarefa.
-   * "desconsiderada" é a única que já está resolvida: fica na lista só como
-   * registro de que foi tirada do cálculo de propósito. */
-  motivo: "sem_marcacao" | "aguardando" | "nao_feito" | "desconsiderada";
-  /** Os registros de desconsideração, para poder desfazê-la ali mesmo. */
-  eventos: string[];
+  /** Por que caiu na lista — vira o rótulo mostrado ao lado da tarefa. */
+  motivo: "sem_marcacao" | "aguardando" | "nao_feito";
 };
 
 const MOTIVO_LABEL: Record<Atrasada["motivo"], string | null> = {
   sem_marcacao: null,
   aguardando: "marcou e ficou sem sua confirmação",
   nao_feito: "ficou como não feita e o prazo passou",
-  desconsiderada: null,
 };
 
 /** Status em que a bola está com o responsável: a tarefa continua na lista
@@ -392,7 +381,7 @@ export default function PendenciasTab({
                           <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
                           <p className="text-xs text-slate-400">
                             {crianca?.name ?? "—"} · R$ {reais(Number(tarefa?.valor_unitario ?? 0))}
-                            {a.devidas > 1 && a.motivo !== "desconsiderada" && (
+                            {a.devidas > 1 && (
                               <span className="text-slate-500">
                                 {" "}
                                 · faltam {a.pendentes} de {a.devidas}
@@ -404,18 +393,6 @@ export default function PendenciasTab({
                           )}
                         </div>
                       </div>
-                      {a.motivo === "desconsiderada" ? (
-                        <div className="flex items-center gap-2 sm:shrink-0">
-                          <span className="text-xs text-slate-400">desconsiderado</span>
-                          <BotaoDireto
-                            className="text-xs text-slate-500 underline disabled:opacity-40"
-                            title="Voltar a considerar esta tarefa"
-                            acao={() => reconsiderarAtrasada(a.eventos)}
-                          >
-                            desfazer
-                          </BotaoDireto>
-                        </div>
-                      ) : (
                       <div className="flex flex-col gap-2 sm:flex-row sm:gap-1.5 sm:shrink-0">
                         <form
                           action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "feito", a.pendentes)}
@@ -448,7 +425,6 @@ export default function PendenciasTab({
                           </BotaoAcao>
                         </form>
                       </div>
-                      )}
                     </li>
                   );
                 })}

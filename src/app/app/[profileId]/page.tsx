@@ -113,7 +113,7 @@ export default async function Dashboard({
     const { data: catalogoFamilia } = await supabase
       .from("task_catalog")
       .select(
-        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo"
+        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo, tipo, finalidade, comodo"
       )
       .eq("family_id", familyId)
       .order("categoria");
@@ -317,7 +317,9 @@ export default async function Dashboard({
   // Perfil criança
   const { data: catalog } = await supabase
     .from("task_catalog")
-    .select("id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone")
+    .select(
+      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, tipo, finalidade, comodo"
+    )
     .eq("family_id", familyId)
     .eq("ativo", true)
     .order("categoria");

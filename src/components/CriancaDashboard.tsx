@@ -8,7 +8,8 @@ import { ocorrenciasPorMes, ocorrenciasPorSemana } from "@/lib/valorBase";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
-import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
+import ListaAgrupada from "@/components/ListaAgrupada";
+import { ehObrigatoria } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
@@ -43,6 +44,9 @@ type Tarefa = {
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
   icone: string | null;
+  tipo: string | null;
+  finalidade: string | null;
+  comodo: string | null;
 };
 
 type EventoMes = {
@@ -71,7 +75,7 @@ const TABS = [
   { key: "inicio", label: "Início" },
   { key: "hoje", label: "Hoje" },
   { key: "semana", label: "Esta semana" },
-  { key: "coletivas", label: "Coletivas" },
+  { key: "coletivas", label: "Bônus" },
   { key: "catalogo", label: "Catálogo Completo" },
   { key: "atividades", label: "Histórico de Atividades" },
 ] as const;
@@ -116,16 +120,7 @@ export default function CriancaDashboard({
   numCriancas: number;
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
-  const {
-    busca: buscaCatalogo,
-    setBusca: setBuscaCatalogo,
-    filtro: filtroCatalogo,
-    setFiltro: setFiltroCatalogo,
-    subcategorias: subcategoriasCatalogo,
-    filtradas: catalogoFiltrado,
-  } = useFiltroCatalogo(catalog);
   const { abertas: secoesAbertas, alternar: alternarSecao } = useSecoesExpansiveis();
-  const filtrandoCatalogo = buscaCatalogo.trim() !== "" || filtroCatalogo !== "";
 
   // Relógio ao vivo (atualiza a cada 30s) pra contagem regressiva do fim do
   // dia e do fim da semana funcionar sozinha na tela, sem precisar recarregar.
@@ -268,41 +263,33 @@ export default function CriancaDashboard({
     );
   }
 
+  /** Lista de Hoje / Esta semana: agrupada por categoria (as tarefas só
+   * suas, as do espaço compartilhado, as da família), com as seções já
+   * abertas — é a lista do dia, o menino precisa ver na hora. O Bônus e o
+   * Catálogo Completo usam o ListaAgrupada, que deixa escolher por qual
+   * classificação agrupar. */
   function Catalogo({
     tarefas,
-    agruparPor,
     aba,
-    comecarAbertas = false,
   }: {
     tarefas: Tarefa[];
-    agruparPor: "categoria" | "subcategoria";
     /** Prefixo da chave: cada aba lembra as próprias categorias abertas. */
     aba: string;
-    /** Hoje e Esta semana começam abertas (são a lista do dia); Coletivas e
-     * o Catálogo Completo começam fechadas, porque são longas. */
-    comecarAbertas?: boolean;
   }) {
     if (tarefas.length === 0) return <p className="text-slate-400 text-sm">Nada por aqui.</p>;
 
     const grupos = new Map<string, Tarefa[]>();
     for (const t of tarefas) {
-      const chave = agruparPor === "subcategoria" ? t.subcategoria ?? "Outras" : CATEGORIA_LABEL[t.categoria] ?? t.categoria;
+      const chave = CATEGORIA_LABEL[t.categoria] ?? t.categoria;
       if (!grupos.has(chave)) grupos.set(chave, []);
       grupos.get(chave)!.push(t);
     }
 
-    let entradas = Array.from(grupos.entries());
-    if (agruparPor === "categoria") {
-      const categoriaDoTitulo = (titulo: string) =>
-        Object.entries(CATEGORIA_LABEL).find(([, label]) => label === titulo)?.[0] ?? titulo;
-      entradas = entradas.sort(
-        (a, b) => (ORDEM_CATEGORIA[categoriaDoTitulo(a[0])] ?? 99) - (ORDEM_CATEGORIA[categoriaDoTitulo(b[0])] ?? 99)
-      );
-    } else {
-      // Coletivas: são 12 áreas fechadas na tela, então ordem alfabética
-      // pra achar rápido (a ordem do banco não diz nada pra quem olha).
-      entradas = entradas.sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
-    }
+    const categoriaDoTitulo = (titulo: string) =>
+      Object.entries(CATEGORIA_LABEL).find(([, label]) => label === titulo)?.[0] ?? titulo;
+    const entradas = Array.from(grupos.entries()).sort(
+      (a, b) => (ORDEM_CATEGORIA[categoriaDoTitulo(a[0])] ?? 99) - (ORDEM_CATEGORIA[categoriaDoTitulo(b[0])] ?? 99)
+    );
 
     return (
       <>
@@ -310,8 +297,7 @@ export default function CriancaDashboard({
           const chave = `${aba}:${titulo}`;
           // O padrão de cada aba vale até a pessoa clicar: a partir daí a
           // escolha dela é que manda (a chave passa a existir no conjunto).
-          const alterada = secoesAbertas.has(chave);
-          const aberta = aba === "catalogo" && filtrandoCatalogo ? true : comecarAbertas ? !alterada : alterada;
+          const aberta = !secoesAbertas.has(chave);
 
           return (
             <SecaoExpansivel
@@ -627,13 +613,11 @@ export default function CriancaDashboard({
           <Catalogo
             tarefas={catalog.filter(
               (t) =>
-                t.categoria !== "coletiva" &&
+                ehObrigatoria(t) &&
                 t.frequencia === "diaria" &&
                 !(t.pula_fim_de_semana && ehSextaOuSabado)
             )}
-            agruparPor="categoria"
             aba="hoje"
-            comecarAbertas
           />
         </>
       )}
@@ -642,10 +626,8 @@ export default function CriancaDashboard({
         <>
           <TextoDaAba>Essas são suas tarefas obrigatórias para fazer até o fim da semana.</TextoDaAba>
           <Catalogo
-            tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "semanal")}
-            agruparPor="categoria"
+            tarefas={catalog.filter((t) => ehObrigatoria(t) && t.frequencia === "semanal")}
             aba="semana"
-            comecarAbertas
           />
         </>
       )}
@@ -655,10 +637,11 @@ export default function CriancaDashboard({
           <TextoDaAba>
             Essas são tarefas que você pode fazer pela família e que vão garantir uma grana extra.
           </TextoDaAba>
-          <Catalogo
-            tarefas={catalog.filter((t) => t.categoria === "coletiva")}
-            agruparPor="subcategoria"
-            aba="coletivas"
+          <ListaAgrupada
+            tarefas={catalog.filter((t) => !ehObrigatoria(t))}
+            dimensoes={["comodo", "finalidade"]}
+            chaveAba="bonus"
+            renderItem={(t) => <TarefaRow t={t} />}
           />
         </>
       )}
@@ -666,16 +649,7 @@ export default function CriancaDashboard({
       {tab === "catalogo" && (
         <>
           <TextoDaAba>Aqui está a lista de todas as tarefas.</TextoDaAba>
-          <ControlesCatalogo
-            busca={buscaCatalogo}
-            setBusca={setBuscaCatalogo}
-            filtro={filtroCatalogo}
-            setFiltro={setFiltroCatalogo}
-            subcategorias={subcategoriasCatalogo}
-            mostrando={catalogoFiltrado.length}
-            total={catalog.length}
-          />
-          <Catalogo tarefas={catalogoFiltrado} agruparPor="categoria" aba="catalogo" />
+          <ListaAgrupada tarefas={catalog} chaveAba="catalogo" renderItem={(t) => <TarefaRow t={t} />} />
         </>
       )}
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[profileId]/actions";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalTotal } from "@/lib/valorBase";
-import { useFiltroCatalogo, ControlesCatalogo, CATEGORIA_LABEL } from "@/components/FiltroCatalogo";
+import ListaAgrupada from "@/components/ListaAgrupada";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
@@ -20,14 +20,9 @@ type Tarefa = {
   icone: string | null;
   /** false = "desnecessária": some das listas dos meninos e das Pendências. */
   ativo: boolean;
-};
-
-// Obrigatórias sempre antes das coletivas (bônus), independente da ordem
-// em que vieram do banco.
-const ORDEM_CATEGORIA: Record<string, number> = {
-  individual: 0,
-  individual_coletiva: 1,
-  coletiva: 2,
+  tipo: string | null;
+  finalidade: string | null;
+  comodo: string | null;
 };
 
 function ItemEditavel({ t }: { t: Tarefa }) {
@@ -178,66 +173,24 @@ export default function CatalogoEditavelTab({
   const ativas = catalog.filter((t) => t.ativo);
   const desnecessarias = catalog.filter((t) => !t.ativo);
 
-  const { busca, setBusca, filtro, setFiltro, subcategorias, temDesnecessarias, filtradas } =
-    useFiltroCatalogo(catalog);
   const { abertas, alternar } = useSecoesExpansiveis();
-
-  // Com busca ou filtro ativo, tudo aparece aberto — senão a pessoa
-  // procuraria uma tarefa e veria só títulos fechados.
-  const filtrando = busca.trim() !== "" || filtro !== "";
-  const estaAberta = (chave: string) => filtrando || abertas.has(chave);
-  const ativasFiltradas = filtradas.filter((t) => t.ativo);
-  const desnecessariasFiltradas = filtradas.filter((t) => !t.ativo);
-
-  const grupos = new Map<string, Tarefa[]>();
-  for (const t of ativasFiltradas) {
-    const chave = CATEGORIA_LABEL[t.categoria] ?? t.categoria;
-    if (!grupos.has(chave)) grupos.set(chave, []);
-    grupos.get(chave)!.push(t);
-  }
-
-  const categoriaDoTitulo = (titulo: string) =>
-    Object.entries(CATEGORIA_LABEL).find(([, label]) => label === titulo)?.[0] ?? titulo;
-
-  const entradas = Array.from(grupos.entries()).sort(
-    (a, b) => (ORDEM_CATEGORIA[categoriaDoTitulo(a[0])] ?? 99) - (ORDEM_CATEGORIA[categoriaDoTitulo(b[0])] ?? 99)
-  );
 
   return (
     <div>
       <ValorBaseCard familyId={familyId} catalog={ativas} valorBaseAtual={valorBaseAtual} />
 
-      <ControlesCatalogo
-        busca={busca}
-        setBusca={setBusca}
-        filtro={filtro}
-        setFiltro={setFiltro}
-        subcategorias={subcategorias}
-        temDesnecessarias={temDesnecessarias}
-        mostrando={ativasFiltradas.length + desnecessariasFiltradas.length}
-        total={catalog.length}
+      <ListaAgrupada
+        tarefas={ativas}
+        chaveAba="catalogo-editavel"
+        renderItem={(t) => (
+          <ItemEditavel key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}`} t={t} />
+        )}
       />
-
-      {entradas.map(([titulo, tarefas]) => (
-        <SecaoExpansivel
-          key={titulo}
-          titulo={titulo}
-          contagem={tarefas.length}
-          aberta={estaAberta(titulo)}
-          onAlternar={() => alternar(titulo)}
-        >
-          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {tarefas.map((t) => (
-              <ItemEditavel key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}`} t={t} />
-            ))}
-          </ul>
-        </SecaoExpansivel>
-      ))}
 
       <SecaoExpansivel
         titulo="Desnecessárias"
         contagem={desnecessarias.length}
-        aberta={estaAberta("Desnecessárias")}
+        aberta={abertas.has("Desnecessárias")}
         onAlternar={() => alternar("Desnecessárias")}
       >
         <p className="text-sm text-slate-400 mb-3">
@@ -250,13 +203,9 @@ export default function CatalogoEditavelTab({
             Nenhuma por enquanto. Para desligar uma tarefa, clique em &ldquo;editar&rdquo; nela e depois em &ldquo;tornar
             desnecessária&rdquo;.
           </p>
-        ) : desnecessariasFiltradas.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Nenhuma tarefa desnecessária bate com a busca ou o filtro escolhidos ({desnecessarias.length} no total).
-          </p>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {desnecessariasFiltradas.map((t) => (
+            {desnecessarias.map((t) => (
               <ItemDesnecessario key={t.id} t={t} />
             ))}
           </ul>

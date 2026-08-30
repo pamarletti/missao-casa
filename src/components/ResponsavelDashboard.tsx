@@ -23,6 +23,9 @@ type Tarefa = {
   pula_fim_de_semana: boolean;
   icone: string | null;
   ativo: boolean;
+  tipo: string | null;
+  finalidade: string | null;
+  comodo: string | null;
 };
 
 type Crianca = { id: string; name: string; icon?: string | null };

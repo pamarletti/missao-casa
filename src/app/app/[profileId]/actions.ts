@@ -501,6 +501,26 @@ export async function editarTarefa(formData: FormData) {
   // novas, pra as duas nunca discordarem: bônus vira "coletiva" (pede
   // autorização, sem cota); obrigatória só sua vira "individual"; obrigatória
   // compartilhada ou da família vira "individual_coletiva".
+  // Quem se reveza na tarefa. Só vale pra compartilhadas; nas outras
+  // finalidades a lista é limpa, pra não sobrar restrição escondida de uma
+  // classificação anterior. Marcar todo mundo grava nulo — é o mesmo que
+  // "vale pra todas", e assim uma criança nova entra na tarefa sozinha.
+  if (finalidade) {
+    if (finalidade === "Compartilhadas") {
+      const escolhidos = formData.getAll("profile_ids").map(String).filter(Boolean);
+      const { data: tarefa } = await supabase.from("task_catalog").select("family_id").eq("id", taskId).single();
+      const { count: totalCriancas } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("family_id", tarefa?.family_id ?? "")
+        .eq("kind", "crianca");
+      patch.profile_ids =
+        escolhidos.length === 0 || escolhidos.length === (totalCriancas ?? 0) ? null : escolhidos;
+    } else {
+      patch.profile_ids = null;
+    }
+  }
+
   if (patch.tipo || patch.finalidade) {
     const { data: antes } = await supabase
       .from("task_catalog")

@@ -12,6 +12,7 @@ import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
+import { valeParaCrianca } from "@/lib/dimensoes";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
 import type { ResumoFeitas } from "@/components/ResumoFeitasCard";
@@ -113,7 +114,7 @@ export default async function Dashboard({
     const { data: catalogoFamilia } = await supabase
       .from("task_catalog")
       .select(
-        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo, tipo, finalidade, comodo"
+        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo, tipo, finalidade, comodo, profile_ids"
       )
       .eq("family_id", familyId)
       .order("categoria");
@@ -127,7 +128,6 @@ export default async function Dashboard({
       (t) => t.categoria === "individual" || t.categoria === "individual_coletiva"
     );
     const obrigatoriasIds = obrigatoriasCatalogo.map((t) => t.id);
-    const potencial30Dias = valorMensalTotal(obrigatoriasCatalogo);
     const inicioJanela30 = diasAtras(today, 29);
 
     const { data: eventos30DiasRaw, error: eventos30Error } = await supabase
@@ -149,6 +149,10 @@ export default async function Dashboard({
       const diasDesdeCriacao = Math.floor(
         (Date.now() - new Date(c.created_at).getTime()) / (24 * 60 * 60 * 1000)
       );
+      // O potencial é o das tarefas que valem pra ESTA criança: uma tarefa
+      // compartilhada só entre alguns não pode contar no teto de quem não
+      // participa dela.
+      const potencial30Dias = valorMensalTotal(obrigatoriasCatalogo.filter((t) => valeParaCrianca(t, c.id)));
       nivelPorPerfil[c.id] = calcularNivel(ganhoLiquido30PorPerfil[c.id] ?? 0, potencial30Dias, diasDesdeCriacao);
     }
 
@@ -214,6 +218,7 @@ export default async function Dashboard({
         const diaDaSemana = diaDaSemanaISO(dia);
         const eraSextaOuSabado = diaDaSemana === 5 || diaDaSemana === 6;
         for (const tarefa of diariasObrigatorias) {
+          if (!valeParaCrianca(tarefa, crianca.id)) continue;
           if (tarefa.pula_fim_de_semana && eraSextaOuSabado) continue;
           if (jaTemRegistroDiario.has(`${crianca.id}|${tarefa.id}|${dia}`)) continue;
           atrasadas.push({ data: dia, taskId: tarefa.id, profileId: crianca.id });
@@ -318,7 +323,7 @@ export default async function Dashboard({
   const { data: catalog } = await supabase
     .from("task_catalog")
     .select(
-      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, tipo, finalidade, comodo"
+      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, tipo, finalidade, comodo, profile_ids"
     )
     .eq("family_id", familyId)
     .eq("ativo", true)
@@ -355,6 +360,10 @@ export default async function Dashboard({
     .gte("data", inicioMes)
     .order("data", { ascending: true });
   if (eventosMesError) console.error("Erro ao buscar eventos do mês:", eventosMesError.message);
+
+  // Tarefas compartilhadas podem valer só para algumas crianças; este menino
+  // só vê (e só é cobrado por) as que valem pra ele.
+  const catalogDoPerfil = (catalog ?? []).filter((t) => valeParaCrianca(t, profile.id));
 
   const eventos = eventosMes ?? [];
   const feitasMes = eventos.filter((e) => e.status === "confirmado").length;
@@ -468,7 +477,7 @@ export default async function Dashboard({
         nome={profile.name}
         familyId={familyId}
         today={today}
-        catalog={catalog ?? []}
+        catalog={catalogDoPerfil}
         eventosMes={eventos}
         atividades={atividades}
         saldoAtual={saldoAtual}

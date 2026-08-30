@@ -72,3 +72,11 @@ export function ordenarGrupos(a: string, b: string): number {
   if (b === SEM) return -1;
   return a.localeCompare(b, "pt-BR");
 }
+
+/** Uma tarefa compartilhada pode indicar QUAIS crianças se revezam nela.
+ * Lista nula ou vazia = todas as crianças da família, que é o
+ * comportamento de sempre (e o das 97 tarefas já cadastradas). */
+export function valeParaCrianca(t: { profile_ids?: string[] | null }, profileId: string): boolean {
+  if (!t.profile_ids || t.profile_ids.length === 0) return true;
+  return t.profile_ids.includes(profileId);
+}

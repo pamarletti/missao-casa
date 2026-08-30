@@ -48,6 +48,7 @@ type Tarefa = {
   tipo: string | null;
   finalidade: string | null;
   comodo: string | null;
+  profile_ids: string[] | null;
 };
 
 type EventoMes = {

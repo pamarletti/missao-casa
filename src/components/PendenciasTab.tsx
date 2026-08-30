@@ -4,6 +4,7 @@ import { registrarDireto, registrarAtrasada, decidir } from "@/app/app/[profileI
 import { inicioDaJanela } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
+import { valeParaCrianca } from "@/lib/dimensoes";
 
 type Tarefa = {
   id: string;
@@ -13,6 +14,8 @@ type Tarefa = {
   ocorrencias_por_dia: number;
   valor_unitario: number;
   icone: string | null;
+  /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
+  profile_ids: string[] | null;
 };
 
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
@@ -102,7 +105,9 @@ export default function PendenciasTab({
     const linhas = tarefas
       .map((t) => ({
         tarefa: t,
-        porFilho: criancas.map((c) => ({ crianca: c, situacao: situacaoDoFilho(t, c.id) })),
+        porFilho: criancas
+          .filter((c) => valeParaCrianca(t, c.id))
+          .map((c) => ({ crianca: c, situacao: situacaoDoFilho(t, c.id) })),
       }))
       .filter((linha) => linha.porFilho.some((pf) => pf.situacao.vagas > 0 || pf.situacao.esperando));
 

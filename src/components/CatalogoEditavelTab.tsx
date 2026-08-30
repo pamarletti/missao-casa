@@ -24,6 +24,8 @@ type Tarefa = {
   tipo: string | null;
   finalidade: string | null;
   comodo: string | null;
+  /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
+  profile_ids: string[] | null;
 };
 
 /** Um <select> por classificação: uma opção só em cada, como pediu a
@@ -34,18 +36,22 @@ function CampoCategoria({
   rotulo,
   valor,
   opcoes,
+  onChange,
 }: {
   nome: string;
   rotulo: string;
   valor: string;
   opcoes: { value: string; label: string }[];
+  /** Quando passado, o campo vira controlado — usado pela Finalidade, que
+   * precisa mostrar/esconder a lista de crianças na hora. */
+  onChange?: (v: string) => void;
 }) {
   return (
     <label className="text-xs text-slate-400">
       {rotulo}
       <select
         name={nome}
-        defaultValue={valor}
+        {...(onChange ? { value: valor, onChange: (e) => onChange(e.target.value) } : { defaultValue: valor })}
         className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-xl px-2 py-1.5 text-sm text-slate-100"
       >
         {opcoes.map((o) => (
@@ -58,8 +64,17 @@ function CampoCategoria({
   );
 }
 
-function ItemEditavel({ t, comodos }: { t: Tarefa; comodos: string[] }) {
+function ItemEditavel({
+  t,
+  comodos,
+  criancas,
+}: {
+  t: Tarefa;
+  comodos: string[];
+  criancas: { id: string; name: string }[];
+}) {
   const [editando, setEditando] = useState(false);
+  const [finalidade, setFinalidade] = useState(t.finalidade ?? "Para mim");
 
   if (!editando) {
     return (
@@ -118,13 +133,37 @@ function ItemEditavel({ t, comodos }: { t: Tarefa; comodos: string[] }) {
           <CampoCategoria
             nome="finalidade"
             rotulo="Finalidade"
-            valor={t.finalidade ?? "Para mim"}
+            valor={finalidade}
+            onChange={setFinalidade}
             opcoes={[
               { value: "Para mim", label: "Para mim" },
               { value: "Compartilhadas", label: "Compartilhadas" },
               { value: "Para a família", label: "Para a família" },
             ]}
           />
+
+          {finalidade === "Compartilhadas" && (
+            <fieldset className="rounded-xl border border-slate-600 p-2">
+              <legend className="text-xs text-slate-400 px-1">Quem se reveza nesta tarefa</legend>
+              <div className="space-y-1">
+                {criancas.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="profile_ids"
+                      value={c.id}
+                      defaultChecked={!t.profile_ids || t.profile_ids.length === 0 || t.profile_ids.includes(c.id)}
+                      className="w-auto"
+                    />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Quem ficar de fora não vê a tarefa nem é cobrado por ela.
+              </p>
+            </fieldset>
+          )}
           <CampoCategoria
             nome="comodo"
             rotulo="Cômodo/Área"
@@ -233,10 +272,12 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
  * altera valores de tarefas já registradas antes dela. */
 export default function CatalogoEditavelTab({
   catalog,
+  criancas,
   familyId,
   valorBaseAtual,
 }: {
   catalog: Tarefa[];
+  criancas: { id: string; name: string }[];
   familyId: string;
   valorBaseAtual: number;
 }) {
@@ -265,6 +306,7 @@ export default function CatalogoEditavelTab({
             key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}-${t.tipo ?? ""}-${t.comodo ?? ""}`}
             t={t}
             comodos={comodos}
+            criancas={criancas}
           />
         )}
       />

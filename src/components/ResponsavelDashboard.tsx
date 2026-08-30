@@ -26,6 +26,8 @@ type Tarefa = {
   tipo: string | null;
   finalidade: string | null;
   comodo: string | null;
+  /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
+  profile_ids: string[] | null;
 };
 
 type Crianca = { id: string; name: string; icon?: string | null };
@@ -114,7 +116,12 @@ export default function ResponsavelDashboard({
 
 
       {tab === "catalogo" && (
-        <CatalogoEditavelTab catalog={catalogoCompleto} familyId={familyId} valorBaseAtual={valorBaseObrigatorias} />
+        <CatalogoEditavelTab
+          catalog={catalogoCompleto}
+          criancas={criancas}
+          familyId={familyId}
+          valorBaseAtual={valorBaseObrigatorias}
+        />
       )}
 
       {tab === "historico" && <HistoricoPorPerfilTab criancas={criancas} atividades={atividades} />}

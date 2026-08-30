@@ -16,7 +16,7 @@
  * aceita a marcação; se não mostra, o servidor recusa. */
 
 import { inicioDaJanela } from "./periodos";
-import { ehAVezDaCrianca } from "./dimensoes";
+import { ehAVezDaCrianca, frequenciaEfetiva } from "./dimensoes";
 
 export type PedidoDeTroca = {
   id: string;
@@ -32,6 +32,7 @@ type TarefaTrocavel = {
   id: string;
   frequencia: string;
   ocorrencias_por_dia?: number | null;
+  dias_da_semana?: number[] | null;
   finalidade?: string | null;
   profile_ids?: string[] | null;
 };
@@ -51,7 +52,7 @@ function comTrocas(
   dataISO: string,
   pedidos: PedidoDeTroca[]
 ): number {
-  const periodo = inicioDaJanela(t.frequencia, dataISO);
+  const periodo = inicioDaJanela(frequenciaEfetiva(t), dataISO);
   const doPeriodo = pedidos.filter(
     (p) => p.task_id === t.id && p.periodo === periodo && p.status === "aceito"
   );
@@ -97,11 +98,11 @@ export function vezesNoPeriodoSemRodizio(
  * vez só), então a tela filtra o que sobrou de períodos que já viraram. */
 export function pedidosVigentes(
   pedidos: PedidoDeTroca[],
-  catalogo: { id: string; frequencia: string }[],
+  catalogo: { id: string; frequencia: string; dias_da_semana?: number[] | null }[],
   hojeISO: string
 ): PedidoDeTroca[] {
   return pedidos.filter((p) => {
     const t = catalogo.find((x) => x.id === p.task_id);
-    return t ? p.periodo === inicioDaJanela(t.frequencia, hojeISO) : false;
+    return t ? p.periodo === inicioDaJanela(frequenciaEfetiva(t), hojeISO) : false;
   });
 }

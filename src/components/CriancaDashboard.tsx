@@ -17,7 +17,7 @@ import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import ListaAgrupada from "@/components/ListaAgrupada";
 import ListaPorArea from "@/components/ListaPorArea";
-import { ehObrigatoria, diaCombinadoLabel, valeNoDia, diasExcluidos, DIAS_DA_SEMANA } from "@/lib/dimensoes";
+import { ehObrigatoria, diasLabel, valeNoDia, temDiaCerto, frequenciaEfetiva } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import AtualizacaoAoVivo from "@/components/AtualizacaoAoVivo";
@@ -54,15 +54,13 @@ type Tarefa = {
   valor_unitario: number;
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
-  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
-  dias_excluidos: number[] | null;
+  /** Dias em que a semanal acontece: 0 = domingo ... 6 = sábado. Vazio = qualquer dia. */
+  dias_da_semana: number[] | null;
   icone: string | null;
   tipo: string | null;
   finalidade: string | null;
   comodo: string | null;
   profile_ids: string[] | null;
-  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
-  dia_da_semana: number | null;
 };
 
 type EventoMes = {
@@ -263,9 +261,11 @@ export default function CriancaDashboard({
 
   /** Todos os registros daquela tarefa na janela atual — hoje, pras
    * diárias; a semana corrente, pras semanais. */
-  function eventosDaJanela(taskId: string, frequencia: string) {
-    const janela = inicioDaJanela(frequencia, today);
-    return eventosMes.filter((e) => e.task_id === taskId && e.data >= janela);
+  function eventosDaJanela(t: Tarefa) {
+    // A semanal com dias marcados tem prazo de um dia só — por isso a
+    // janela vem de frequenciaEfetiva, e não da frequência crua.
+    const janela = inicioDaJanela(frequenciaEfetiva(t), today);
+    return eventosMes.filter((e) => e.task_id === t.id && e.data >= janela);
   }
 
   /** Estados em que o pedido ainda está correndo: ou esperando o
@@ -287,7 +287,7 @@ export default function CriancaDashboard({
    * a semana virar. O único momento em que ela some da lista é enquanto um
    * pedido está em andamento. */
   function vagasRestantes(t: Tarefa) {
-    const eventos = eventosDaJanela(t.id, t.frequencia);
+    const eventos = eventosDaJanela(t);
 
     if (t.categoria === "coletiva") {
       const emAndamento = eventos.filter((e) => EM_ANDAMENTO.includes(e.status)).length;
@@ -310,7 +310,7 @@ export default function CriancaDashboard({
   }
 
   function TarefaRow({ t }: { t: Tarefa }) {
-    const eventos = eventosDaJanela(t.id, t.frequencia);
+    const eventos = eventosDaJanela(t);
     const { total, ocupadas, vagas } = vagasRestantes(t);
 
     // Coletiva já autorizada, esperando o "Feito" do menino.
@@ -344,14 +344,7 @@ export default function CriancaDashboard({
             <span className="text-slate-500"> · {t.ocorrencias_por_dia}× por dia</span>
           )}
         </p>
-        {diaCombinadoLabel(t) && (
-          <p className="text-xs text-sky-400 leading-tight">{diaCombinadoLabel(t)}</p>
-        )}
-        {diasExcluidos(t).length > 0 && (
-          <p className="text-xs text-sky-400 leading-tight">
-            menos {diasExcluidos(t).map((d) => DIAS_DA_SEMANA[d].replace("-feira", "")).join(", ")}
-          </p>
-        )}
+        {diasLabel(t) && <p className="text-xs text-sky-400 leading-tight">{diasLabel(t)}</p>}
 
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
           {total > 1 && (
@@ -627,7 +620,7 @@ export default function CriancaDashboard({
   // nenhuma marcação ainda, ou coletivas já liberadas esperando só o
   // "Feito" — nunca as que já foram feitas ou já estão decididas.
   const coletivasSugeridas = coletivas.filter(
-    (t) => aindaDaTempo(t) || eventosDaJanela(t.id, t.frequencia).some((e) => e.status === "liberada")
+    (t) => aindaDaTempo(t) || eventosDaJanela(t).some((e) => e.status === "liberada")
   );
   const sugestoesTempinho = [...diariasEmRisco, ...semanaisEmRisco, ...coletivasSugeridas].slice(0, 4);
 
@@ -915,19 +908,14 @@ export default function CriancaDashboard({
             tarefas={catalog.filter((t) => {
               if (!ehObrigatoria(t) || !(ehMinhaVez(t) || passeiAdiante(t))) return false;
 
-              if (periodo === "semana") return t.frequencia === "semanal";
+              // "Esta semana" é das semanais sem dia marcado: as que
+              // valem a semana toda, com prazo no domingo à noite.
+              if (periodo === "semana") return t.frequencia === "semanal" && !temDiaCerto(t);
 
-              // Em "Hoje" entram as diárias e também as semanais que têm
-              // este dia como o combinado da casa — elas continuam valendo
-              // a semana inteira (o prazo e a cota não mudam), mas hoje é o
-              // dia delas, e é hoje que precisam ser lembradas.
-              const ehDoDia =
-                t.frequencia === "diaria" ||
-                (t.frequencia === "semanal" && t.dia_da_semana === diaDaSemanaRecife);
-              if (!ehDoDia) return false;
-
-              // A família pode ter tirado alguns dias desta tarefa (a
-              // mochila não vale na sexta nem no sábado, por exemplo).
+              // "Hoje" reúne as diárias e as semanais que caem neste dia —
+              // nestas o prazo é o próprio dia, então é aqui que elas moram.
+              if (t.frequencia !== "diaria" && t.frequencia !== "semanal") return false;
+              if (t.frequencia === "semanal" && !temDiaCerto(t)) return false;
               return valeNoDia(t, diaDaSemanaRecife);
             })}
             aba={`obrigatorias:${periodo}`}

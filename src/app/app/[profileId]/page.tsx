@@ -12,7 +12,7 @@ import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
-import { valeParaCrianca, valeNoDia } from "@/lib/dimensoes";
+import { valeParaCrianca, valeNoDia, temDiaCerto, frequenciaEfetiva } from "@/lib/dimensoes";
 import { vezesNoPeriodo, type PedidoDeTroca } from "@/lib/trocas";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
@@ -115,7 +115,7 @@ export default async function Dashboard({
     const { data: catalogoFamilia } = await supabase
       .from("task_catalog")
       .select(
-        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, dias_excluidos, icone, ativo, tipo, finalidade, comodo, profile_ids, dia_da_semana"
+        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, dias_da_semana, icone, ativo, tipo, finalidade, comodo, profile_ids"
       )
       .eq("family_id", familyId)
       .order("categoria");
@@ -226,8 +226,15 @@ export default async function Dashboard({
     //
     // Janela de 14 dias, e nunca antes da criação do perfil do menino, pra
     // não acumular uma lista enorme de coisas muito antigas.
-    const diariasObrigatorias = obrigatoriasCatalogo.filter((t) => t.frequencia === "diaria");
-    const semanaisObrigatorias = obrigatoriasCatalogo.filter((t) => t.frequencia === "semanal");
+    // "De prazo diário" reúne as diárias e as semanais com dias marcados:
+    // nestas o prazo é o próprio dia. As semanais sem dia marcado valem a
+    // semana inteira e são conferidas semana a semana, mais abaixo.
+    const diariasObrigatorias = obrigatoriasCatalogo.filter(
+      (t) => frequenciaEfetiva(t) === "diaria"
+    );
+    const semanaisObrigatorias = obrigatoriasCatalogo.filter(
+      (t) => t.frequencia === "semanal" && !temDiaCerto(t)
+    );
     const inicioJanelaAtrasadas = diasAtras(today, 13);
     // A busca começa na segunda-feira da semana em que a janela cai, e não
     // no primeiro dia dela: uma tarefa semanal pode ter sido feita numa
@@ -259,7 +266,7 @@ export default async function Dashboard({
     for (const e of eventosRecentesRaw ?? []) {
       const tarefa = obrigatoriasCatalogo.find((t) => t.id === e.task_id);
       if (!tarefa) continue;
-      const periodo = tarefa.frequencia === "semanal" ? inicioDaSemana(e.data) : e.data;
+      const periodo = frequenciaEfetiva(tarefa) === "semanal" ? inicioDaSemana(e.data) : e.data;
       const chave = `${e.profile_id}|${e.task_id}|${periodo}`;
       if (DESFECHOS.includes(e.status)) {
         resolvidas.set(chave, (resolvidas.get(chave) ?? 0) + 1);
@@ -439,7 +446,7 @@ export default async function Dashboard({
   const { data: catalog } = await supabase
     .from("task_catalog")
     .select(
-      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, dias_excluidos, icone, tipo, finalidade, comodo, profile_ids, dia_da_semana"
+      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, dias_da_semana, icone, tipo, finalidade, comodo, profile_ids"
     )
     .eq("family_id", familyId)
     .eq("ativo", true)

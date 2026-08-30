@@ -13,11 +13,9 @@ export type TarefaClassificavel = {
   subcategoria?: string | null;
   frequencia: string;
   ocorrencias_por_dia?: number | null;
-  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
-  dia_da_semana?: number | null;
-  /** Dias em que a diária NÃO vale. Nulo/vazio = todos os dias. */
-  dias_excluidos?: number[] | null;
-  pula_fim_de_semana?: boolean | null;
+  /** Dias em que a tarefa semanal acontece: 0 = domingo ... 6 = sábado.
+   * Nulo ou vazio = uma vez por semana, em qualquer dia. */
+  dias_da_semana?: number[] | null;
   tipo?: string | null;
   finalidade?: string | null;
   comodo?: string | null;
@@ -53,39 +51,57 @@ export function ehObrigatoria(t: TarefaClassificavel): boolean {
   return tipoDa(t) === "Obrigatória";
 }
 
-/** Os dias em que a tarefa NÃO vale.
+/** ──────────────────────────────────────────────────────────────
+ * O quadro de frequências
  *
- * Lê a coluna nova (`dias_excluidos`) e cai na antiga (`pula_fim_de_semana`,
- * que queria dizer sexta e sábado) para linhas que ainda não passaram pela
- * migração 016. Fonte única: telas, cálculo de valor e lista de atrasadas
- * usam esta função, para nunca discordarem sobre em que dias uma tarefa
- * existe. */
+ *   diária          — todo dia, 1, 2 ou 3 vezes por dia
+ *   semanal         — nos dias marcados; sem dia marcado, uma vez por
+ *                     semana, quando der
+ *   mensal          — uma vez por mês
+ *   não específica  — sem ritmo nenhum, só nas tarefas de bônus
+ *
+ * A semanal COM dias marcados é, na prática, uma tarefa de dia certo: o
+ * prazo dela é o próprio dia, e não o fim da semana. É o que a casa quer
+ * dizer com "o banheiro é às quartas" — se era quarta e não foi feito, na
+ * quinta está atrasado. Sem dias marcados, a semanal continua valendo a
+ * semana inteira, com prazo no domingo à noite.
+ * ────────────────────────────────────────────────────────────── */
+
 type TarefaComDias = {
   frequencia: string;
-  dias_excluidos?: number[] | null;
-  pula_fim_de_semana?: boolean | null;
+  ocorrencias_por_dia?: number | null;
+  dias_da_semana?: number[] | null;
 };
 
-export function diasExcluidos(t: TarefaComDias): number[] {
-  if (t.dias_excluidos && t.dias_excluidos.length > 0) return t.dias_excluidos;
-  if (t.pula_fim_de_semana) return [5, 6];
-  return [];
+/** Os dias em que a tarefa acontece. Lista vazia numa semanal quer dizer
+ * "qualquer dia da semana". */
+export function diasDaSemana(t: TarefaComDias): number[] {
+  if (t.frequencia !== "semanal") return [];
+  return t.dias_da_semana ?? [];
 }
 
-/** A tarefa vale neste dia da semana? Só as diárias podem não valer: uma
- * semanal ou mensal tem a janela inteira para ser feita. */
+/** Tem dia certo? É o que separa as duas semanais. */
+export function temDiaCerto(t: TarefaComDias): boolean {
+  return diasDaSemana(t).length > 0;
+}
+
+/** A frequência que vale para efeito de PRAZO.
+ *
+ * Uma semanal com dias marcados se comporta como diária: a janela dela é o
+ * dia. Usar isto no lugar de `t.frequencia` em toda conta de janela é o que
+ * mantém tela e servidor de acordo sobre quando a tarefa vira atrasada. */
+export function frequenciaEfetiva(t: TarefaComDias): string {
+  return t.frequencia === "semanal" && temDiaCerto(t) ? "diaria" : t.frequencia;
+}
+
+/** A tarefa vale neste dia da semana? */
 export function valeNoDia(t: TarefaComDias, diaDaSemana: number): boolean {
-  if (t.frequencia !== "diaria") return true;
-  return !diasExcluidos(t).includes(diaDaSemana);
-}
-
-/** Quantos dias por semana a tarefa diária realmente acontece. */
-export function diasPorSemana(t: TarefaComDias): number {
-  return Math.max(0, 7 - diasExcluidos(t).length);
+  if (!temDiaCerto(t)) return true;
+  return diasDaSemana(t).includes(diaDaSemana);
 }
 
 /** Nomes na ordem do getDay do JavaScript, que é a mesma da coluna
- * task_catalog.dia_da_semana. */
+ * task_catalog.dias_da_semana. */
 export const DIAS_DA_SEMANA = [
   "domingo",
   "segunda-feira",
@@ -96,14 +112,17 @@ export const DIAS_DA_SEMANA = [
   "sábado",
 ];
 
-/** "às segundas", "aos domingos" — o combinado da casa, escrito do jeito
- * que se fala. Vazio quando a tarefa não tem dia marcado. */
-export function diaCombinadoLabel(t: TarefaClassificavel): string {
-  if (t.frequencia !== "semanal" || t.dia_da_semana == null) return "";
-  const nome = DIAS_DA_SEMANA[t.dia_da_semana];
-  if (!nome) return "";
-  if (nome === "domingo" || nome === "sábado") return `aos ${nome}s`;
-  return `às ${nome.replace("-feira", "s")}`;
+/** Versão curta, para caber no cartão: "seg, qui". Vazio quando a tarefa
+ * não tem dia marcado. */
+export function diasLabel(t: TarefaClassificavel): string {
+  const dias = diasDaSemana(t);
+  if (dias.length === 0) return "";
+  // Da segunda ao domingo, que é como a semana do app começa.
+  const ordem = [1, 2, 3, 4, 5, 6, 0];
+  return ordem
+    .filter((d) => dias.includes(d))
+    .map((d) => DIAS_DA_SEMANA[d].slice(0, 3))
+    .join(", ");
 }
 
 export function frequenciaLabel(t: TarefaClassificavel): string {
@@ -112,8 +131,8 @@ export function frequenciaLabel(t: TarefaClassificavel): string {
     return vezes > 1 ? `Diária (${vezes}× por dia)` : "Diária";
   }
   if (t.frequencia === "semanal") {
-    const dia = diaCombinadoLabel(t);
-    return dia ? `Semanal (${dia})` : "Semanal";
+    const dias = diasLabel(t);
+    return dias ? `Semanal (${dias})` : "Semanal";
   }
   if (t.frequencia === "mensal") return "Mensal";
   if (t.frequencia === "nao_especifica") return "Não específica";

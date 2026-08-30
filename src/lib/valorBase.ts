@@ -6,17 +6,16 @@
  * Uma tarefa diária pode não valer em alguns dias da semana (ex.: "arrumar
  * a mochila" não vale na sexta nem no sábado — não tem aula no dia
  * seguinte). Quantos dias sobram é o que decide quanto ela rende: 5 dias por
- * semana são 5 ocorrências, não 7. Quem sabe os dias é `diasPorSemana`, em
+ * semana são 5 ocorrências, não 7. Quem sabe os dias é `diasDaSemana`, em
  * dimensoes.ts — aqui só se multiplica. */
 
-import { diasPorSemana } from "./dimensoes";
+import { diasDaSemana } from "./dimensoes";
 
 export type TarefaValorBase = {
   valor_unitario: number | string;
   frequencia: string;
   ocorrencias_por_dia?: number | null;
-  dias_excluidos?: number[] | null;
-  pula_fim_de_semana?: boolean | null;
+  dias_da_semana?: number[] | null;
 };
 
 /** Um mês tem pouco mais de 4 semanas: 30 dias / 7 = 4,2857. Manter esse
@@ -25,19 +24,24 @@ export type TarefaValorBase = {
  * 20 arredondados de antes. */
 const SEMANAS_POR_MES = 30 / 7;
 
-export function ocorrenciasPorMes(t: TarefaValorBase): number {
-  if (t.frequencia === "diaria") {
-    return (t.ocorrencias_por_dia || 1) * diasPorSemana(t) * SEMANAS_POR_MES;
+export function ocorrenciasPorSemana(t: TarefaValorBase): number {
+  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) * 7;
+  if (t.frequencia === "semanal") {
+    const dias = diasDaSemana(t);
+    // Com dias marcados, acontece uma vez em cada um deles; sem dias
+    // marcados, é uma vez na semana, quando der.
+    return dias.length > 0 ? dias.length : 1;
   }
-  if (t.frequencia === "semanal") return 4;
-  if (t.frequencia === "mensal") return 1;
-  return 0;
+  return 0; // mensal e "não específica" não entram na projeção semanal
 }
 
-export function ocorrenciasPorSemana(t: TarefaValorBase): number {
-  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) * diasPorSemana(t);
-  if (t.frequencia === "semanal") return 1;
-  return 0; // mensal e "não específica" não entram na projeção semanal
+export function ocorrenciasPorMes(t: TarefaValorBase): number {
+  if (t.frequencia === "mensal") return 1;
+  // A semanal sem dia marcado segue com as 4 de sempre: é um compromisso
+  // por semana, não uma conta de dias.
+  if (t.frequencia === "semanal" && diasDaSemana(t).length === 0) return 4;
+  const porSemana = ocorrenciasPorSemana(t);
+  return porSemana === 0 ? 0 : porSemana * SEMANAS_POR_MES;
 }
 
 export function valorMensalTotal(tarefas: TarefaValorBase[]): number {

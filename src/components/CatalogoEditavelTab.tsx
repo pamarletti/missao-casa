@@ -5,7 +5,7 @@ import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalPorCrianca } from "@/lib/valorBase";
 import ListaAgrupada from "@/components/ListaAgrupada";
-import { tipoDa, DIAS_DA_SEMANA, diaCombinadoLabel, diasExcluidos } from "@/lib/dimensoes";
+import { tipoDa, DIAS_DA_SEMANA, diasLabel, diasDaSemana } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { reais, paraCampo } from "@/lib/moeda";
@@ -19,8 +19,8 @@ type Tarefa = {
   frequencia: string;
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
-  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
-  dias_excluidos: number[] | null;
+  /** Dias em que a semanal acontece: 0 = domingo ... 6 = sábado. Vazio = qualquer dia. */
+  dias_da_semana: number[] | null;
   valor_unitario: number;
   icone: string | null;
   /** false = "desnecessária": some das listas dos meninos e das Pendências. */
@@ -30,13 +30,11 @@ type Tarefa = {
   comodo: string | null;
   /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
   profile_ids: string[] | null;
-  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
-  dia_da_semana: number | null;
 };
 
-/** Traduz a tarefa para a opção de frequência que a tela mostra. */
+/** A opção de frequência que a tela mostra — hoje é a própria coluna do
+ * banco, sem tradução. */
 function modoDe(t: Tarefa): string {
-  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) > 1 ? "diaria_varias" : "diaria";
   return t.frequencia;
 }
 
@@ -101,9 +99,8 @@ function ItemEditavel({
 }) {
   const [editando, setEditando] = useState(false);
   const [finalidade, setFinalidade] = useState(t.finalidade ?? "Para mim");
-  // "diaria_varias" não é um valor do banco: é só a opção da tela que faz
-  // aparecer o campo de quantas vezes. No banco continua frequencia
-  // "diaria" + ocorrencias_por_dia.
+  // A frequência escolhida na tela: é ela que decide se aparece o campo de
+  // "quantas vezes por dia" (diária) ou o de dias da semana (semanal).
   const [modoFrequencia, setModoFrequencia] = useState(modoDe(t));
   // Trocar obrigatória <-> bônus mexe em muita coisa de uma vez (listas das
   // crianças, cobrança, valor base), então o campo avisa na hora da troca.
@@ -128,7 +125,7 @@ function ItemEditavel({
         <span className="text-2xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
-        {diaCombinadoLabel(t) && <p className="text-xs text-sky-400">{diaCombinadoLabel(t)}</p>}
+        {diasLabel(t) && <p className="text-xs text-sky-400">{diasLabel(t)}</p>}
         <button
           type="button"
           className="text-xs text-slate-500 underline mt-1"
@@ -239,7 +236,6 @@ function ItemEditavel({
             onChange={setModoFrequencia}
             opcoes={[
               { value: "diaria", label: "Diária" },
-              { value: "diaria_varias", label: "Diária, mais de uma vez por dia" },
               { value: "semanal", label: "Semanal" },
               { value: "mensal", label: "Mensal" },
               // Só no bônus: uma tarefa sem ritmo nenhum, feita quando der.
@@ -250,33 +246,20 @@ function ItemEditavel({
                 : []),
             ]}
           />
-          <input type="hidden" name="frequencia" value={modoFrequencia === "diaria_varias" ? "diaria" : modoFrequencia} />
+          <input type="hidden" name="frequencia" value={modoFrequencia} />
 
           {modoFrequencia === "semanal" && (
-            <CampoCategoria
-              nome="dia_da_semana"
-              rotulo="Dia da semana"
-              valor={t.dia_da_semana == null ? "" : String(t.dia_da_semana)}
-              opcoes={[
-                { value: "", label: "Qualquer dia da semana" },
-                // Começa na segunda, que é como a semana do app começa.
-                ...[1, 2, 3, 4, 5, 6, 0].map((n) => ({ value: String(n), label: DIAS_DA_SEMANA[n] })),
-              ]}
-            />
-          )}
-
-          {(modoFrequencia === "diaria" || modoFrequencia === "diaria_varias") && (
             <fieldset className="text-xs text-slate-400">
-              <legend>Dias em que esta tarefa não vale</legend>
+              <legend>Em quais dias esta tarefa acontece</legend>
               <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
                 {/* Começa na segunda, como a semana do app. */}
                 {[1, 2, 3, 4, 5, 6, 0].map((n) => (
                   <label key={n} className="flex items-center gap-1">
                     <input
                       type="checkbox"
-                      name="dias_excluidos"
+                      name="dias_da_semana"
                       value={n}
-                      defaultChecked={diasExcluidos(t).includes(n)}
+                      defaultChecked={diasDaSemana(t).includes(n)}
                       className="w-auto"
                     />
                     {DIAS_DA_SEMANA[n].slice(0, 3)}
@@ -284,18 +267,18 @@ function ItemEditavel({
                 ))}
               </div>
               <p className="mt-1 text-slate-500">
-                Nenhum marcado = todo dia. Marcar um dia tira a tarefa da lista dele — e tira também o desconto,
-                já que não havia o que fazer.
+                Nenhum marcado = uma vez por semana, quando der, com prazo no domingo à noite. Marcando dias, a
+                tarefa acontece em cada um deles — e o prazo passa a ser o próprio dia.
               </p>
             </fieldset>
           )}
 
-          {modoFrequencia === "diaria_varias" ? (
+          {modoFrequencia === "diaria" ? (
             <CampoCategoria
               nome="ocorrencias_por_dia"
               rotulo="Quantas vezes por dia"
-              valor={String(Math.max(2, t.ocorrencias_por_dia || 2))}
-              opcoes={[2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n}× por dia` }))}
+              valor={String(Math.min(3, Math.max(1, t.ocorrencias_por_dia || 1)))}
+              opcoes={[1, 2, 3].map((n) => ({ value: String(n), label: n === 1 ? "1× por dia" : `${n}× por dia` }))}
             />
           ) : (
             <input type="hidden" name="ocorrencias_por_dia" value="1" />

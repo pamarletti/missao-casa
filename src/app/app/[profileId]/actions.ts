@@ -11,6 +11,7 @@ import {
   escalarParaTotalMensal,
 } from "@/lib/valorBase";
 import { inicioDaJanela, inicioDaSemana, hojeEmRecife } from "@/lib/periodos";
+import { frequenciaEfetiva } from "@/lib/dimensoes";
 import { paraNumero } from "@/lib/moeda";
 import {
   vezesNoPeriodo,
@@ -149,7 +150,7 @@ async function vagasRestantes(
   respeitarRodizio = true
 ) {
   const hoje = hojeEmRecife();
-  const janela = inicioDaJanela(task.frequencia, hoje);
+  const janela = inicioDaJanela(frequenciaEfetiva(task), hoje);
   const base = supabase
     .from("task_events")
     .select("id", { count: "exact", head: true })
@@ -181,7 +182,7 @@ export async function markOrRequest(taskId: string, familyId: string) {
 
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("id, categoria, valor_unitario, frequencia, ocorrencias_por_dia, finalidade, profile_ids")
+    .select("id, categoria, valor_unitario, frequencia, ocorrencias_por_dia, dias_da_semana, finalidade, profile_ids")
     .eq("id", taskId)
     .single();
   if (!task) return;
@@ -376,7 +377,7 @@ export async function registrarDireto(
   const supabase = createClient();
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("id, valor_unitario, categoria, frequencia, ocorrencias_por_dia, finalidade, profile_ids")
+    .select("id, valor_unitario, categoria, frequencia, ocorrencias_por_dia, dias_da_semana, finalidade, profile_ids")
     .eq("id", taskId)
     .single();
   if (!task) return;
@@ -622,37 +623,30 @@ export async function editarTarefa(formData: FormData) {
   if (FREQUENCIAS.includes(frequencia)) {
     patch.frequencia = frequencia;
 
-    // Dia combinado: só existe em tarefa semanal. Nas outras a coluna é
-    // limpa, pra não sobrar um dia escondido de uma classificação anterior.
+    // Os dias marcados só existem na semanal; as vezes por dia, só na
+    // diária. Nas outras frequências os dois voltam ao padrão, pra não
+    // sobrar regra escondida de uma classificação anterior.
     if (frequencia === "semanal") {
-      const dia = String(formData.get("dia_da_semana") || "").trim();
-      const numero = Number(dia);
-      patch.dia_da_semana =
-        dia !== "" && Number.isInteger(numero) && numero >= 0 && numero <= 6 ? numero : null;
-    } else {
-      patch.dia_da_semana = null;
-    }
-
-    // "vezes por dia" e "dias de folga" só fazem sentido em tarefa diária;
-    // nas outras voltam ao padrão, pra não sobrar regra escondida de uma
-    // classificação anterior.
-    if (frequencia !== "diaria") {
-      patch.ocorrencias_por_dia = 1;
-      patch.dias_excluidos = null;
-    } else {
-      const vezes = Math.floor(Number(formData.get("ocorrencias_por_dia") || 1));
-      patch.ocorrencias_por_dia = Number.isFinite(vezes) && vezes >= 1 && vezes <= 12 ? vezes : 1;
-
       const dias = formData
-        .getAll("dias_excluidos")
+        .getAll("dias_da_semana")
         .map((d) => Number(d))
         .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
-      patch.dias_excluidos = dias.length > 0 ? Array.from(new Set(dias)).sort() : null;
-      // A coluna antiga sai de cena: quem manda agora é a lista. Deixá-la
-      // ligada faria a tarefa voltar a pular sexta e sábado sozinha, se um
-      // dia a lista fosse esvaziada.
-      patch.pula_fim_de_semana = false;
+      // Marcar os sete dias é o mesmo que uma tarefa de todo dia: guardamos
+      // como lista mesmo assim, pra tela mostrar o que foi escolhido.
+      patch.dias_da_semana = dias.length > 0 ? Array.from(new Set(dias)).sort() : null;
+      patch.ocorrencias_por_dia = 1;
+    } else {
+      patch.dias_da_semana = null;
+      if (frequencia === "diaria") {
+        const vezes = Math.floor(Number(formData.get("ocorrencias_por_dia") || 1));
+        patch.ocorrencias_por_dia = Number.isFinite(vezes) && vezes >= 1 && vezes <= 3 ? vezes : 1;
+      } else {
+        patch.ocorrencias_por_dia = 1;
+      }
     }
+    // A coluna antiga de "pula o fim de semana" sai de cena: quem diz em
+    // que dias a tarefa acontece agora é a lista.
+    patch.pula_fim_de_semana = false;
   }
 
   // `categoria` é a coluna antiga, que ainda comanda regras do app (quem
@@ -718,13 +712,12 @@ export async function definirValorBase(formData: FormData) {
   const supabase = createClient();
   const { data: obrigatorias } = await supabase
     .from("task_catalog")
-    // `dias_excluidos` PRECISA vir aqui. Sem ela, a conta de quantas vezes
-    // a tarefa acontece por mês some do alvo: o servidor calcula achando
-    // que a tarefa vale todo dia, o catálogo mostra o total certo (com os
-    // dias de folga descontados), e o card acusa uma divergência que a
-    // pessoa não consegue fechar por mais que repita a operação.
+    // `dias_da_semana` PRECISA vir aqui. Sem ela, a conta de quantas vezes
+    // a tarefa acontece por mês sai diferente da que o catálogo mostra, e o
+    // card acusa uma divergência que a pessoa não consegue fechar por mais
+    // que repita a operação.
     .select(
-      "id, valor_unitario, frequencia, ocorrencias_por_dia, dias_excluidos, pula_fim_de_semana, finalidade, profile_ids"
+      "id, valor_unitario, frequencia, ocorrencias_por_dia, dias_da_semana, finalidade, profile_ids"
     )
     .eq("family_id", familyId)
     .in("categoria", ["individual", "individual_coletiva"])

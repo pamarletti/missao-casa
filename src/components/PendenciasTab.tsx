@@ -6,7 +6,7 @@ import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
 import { reais } from "@/lib/moeda";
-import { diaCombinadoLabel, valeNoDia } from "@/lib/dimensoes";
+import { diasLabel, valeNoDia, temDiaCerto, frequenciaEfetiva } from "@/lib/dimensoes";
 
 type Tarefa = {
   id: string;
@@ -19,11 +19,8 @@ type Tarefa = {
   finalidade: string | null;
   /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
   profile_ids: string[] | null;
-  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
-  dia_da_semana: number | null;
-  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
-  dias_excluidos: number[] | null;
-  pula_fim_de_semana: boolean | null;
+  /** Dias em que a semanal acontece: 0 = domingo ... 6 = sábado. Vazio = qualquer dia. */
+  dias_da_semana: number[] | null;
 };
 
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
@@ -145,7 +142,7 @@ export default function PendenciasTab({
    * panelas 2×...) continuam na lista até completar as vezes do dia — por
    * isso conta vagas, e não só "tem ou não tem registro". */
   function situacaoDoFilho(t: Tarefa, profileId: string) {
-    const janela = inicioDaJanela(t.frequencia, hojeISO);
+    const janela = inicioDaJanela(frequenciaEfetiva(t), hojeISO);
     const doFilho = eventos.filter(
       (e) => e.task_id === t.id && e.profile_id === profileId && e.data >= janela
     );
@@ -208,9 +205,7 @@ export default function PendenciasTab({
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xl">{iconeTarefa(tarefa)}</span>
                   <p className="font-medium">{tarefa.name}</p>
-                  {diaCombinadoLabel(tarefa) && (
-                    <span className="text-xs text-sky-400">{diaCombinadoLabel(tarefa)}</span>
-                  )}
+                  {diasLabel(tarefa) && <span className="text-xs text-sky-400">{diasLabel(tarefa)}</span>}
                   <span className="text-xs text-slate-400 ml-auto">
                     R$ {reais(Number(tarefa.valor_unitario))}
                   </span>
@@ -442,12 +437,16 @@ export default function PendenciasTab({
       <Bloco
         titulo="Hoje"
         descricao="Tudo o que é obrigatório para ser feito ainda hoje."
-        tarefas={obrigatorias.filter((t) => t.frequencia === "diaria" && valeNoDia(t, diaDeHoje))}
+        tarefas={obrigatorias.filter(
+          (t) =>
+            (t.frequencia === "diaria" || (t.frequencia === "semanal" && temDiaCerto(t))) &&
+            valeNoDia(t, diaDeHoje)
+        )}
       />
       <Bloco
         titulo="Esta semana"
         descricao="Tudo o que é obrigatório para ser feito até o final da semana."
-        tarefas={obrigatorias.filter((t) => t.frequencia === "semanal")}
+        tarefas={obrigatorias.filter((t) => t.frequencia === "semanal" && !temDiaCerto(t))}
       />
     </div>
   );

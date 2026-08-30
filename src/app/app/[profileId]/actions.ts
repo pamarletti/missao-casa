@@ -78,33 +78,46 @@ async function eventoParaRefazer(
   return data?.id ?? null;
 }
 
-/** Quantas vezes a tarefa ainda pode ser marcada nesta janela.
+/** Quantas vezes a tarefa ainda pode ser marcada agora. Espelha a mesma
+ * regra da tela (vagasRestantes em CriancaDashboard.tsx), pra o servidor
+ * não aceitar mais marcações do que o combinado mesmo que o navegador
+ * mande — dois toques rápidos, duas abas abertas.
  *
- * Tarefas que acontecem mais de uma vez por dia (lavar a louça 3×, lavar
- * panelas 2×...) voltam pra lista depois de cada marcação, até completar
- * as vezes do dia. Registros de "não feito" e "pedido para refazer" não
- * ocupam vaga — ainda dá tempo de fazer enquanto a janela não virar.
+ * OBRIGATÓRIAS têm cota por janela: as que acontecem mais de uma vez por
+ * dia (lavar a louça 3×, lavar panelas 2×...) voltam pra lista depois de
+ * cada marcação, até completar as vezes do dia. "Não feito" e "pedido para
+ * refazer" não ocupam vaga.
  *
- * Existe pra o servidor não aceitar mais marcações do que o combinado,
- * mesmo que a tela mande (dois toques rápidos, duas abas abertas). */
+ * COLETIVAS não têm cota: quem define o ritmo é o responsável, que autoriza
+ * cada pedido. Uma coletiva só fica indisponível enquanto houver um pedido
+ * em andamento; assim que é confirmada, volta a aceitar "Quero fazer". */
 async function vagasRestantes(
   supabase: ReturnType<typeof createClient>,
   taskId: string,
   profileId: string,
+  categoria: string,
   frequencia: string,
   ocorrenciasPorDia: number | null
 ) {
-  const total = frequencia === "diaria" ? ocorrenciasPorDia || 1 : 1;
   const janela = inicioDaJanela(frequencia, hojeEmRecife());
-
-  const { count } = await supabase
+  const base = supabase
     .from("task_events")
     .select("id", { count: "exact", head: true })
     .eq("task_id", taskId)
     .eq("profile_id", profileId)
-    .gte("data", janela)
-    .not("status", "in", "(nao_feito,pedido_para_refazer)");
+    .gte("data", janela);
 
+  if (categoria === "coletiva") {
+    const { count } = await base.in("status", [
+      "aguardando_autorizacao",
+      "liberada",
+      "aguardando_confirmacao",
+    ]);
+    return (count ?? 0) > 0 ? 0 : 1;
+  }
+
+  const total = frequencia === "diaria" ? ocorrenciasPorDia || 1 : 1;
+  const { count } = await base.not("status", "in", "(nao_feito,pedido_para_refazer)");
   return Math.max(0, total - (count ?? 0));
 }
 
@@ -129,6 +142,7 @@ export async function markOrRequest(taskId: string, familyId: string) {
       supabase,
       taskId,
       active.profileId,
+      task.categoria,
       task.frequencia,
       task.ocorrencias_por_dia
     );
@@ -261,7 +275,7 @@ export async function registrarDireto(
   const supabase = createClient();
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("valor_unitario, frequencia, ocorrencias_por_dia")
+    .select("valor_unitario, categoria, frequencia, ocorrencias_por_dia")
     .eq("id", taskId)
     .single();
   if (!task) return;
@@ -283,7 +297,14 @@ export async function registrarDireto(
     if (idParaRefazer) {
       await supabase.from("task_events").update(dadosFeito).eq("id", idParaRefazer);
     } else {
-      const vagas = await vagasRestantes(supabase, taskId, profileId, task.frequencia, task.ocorrencias_por_dia);
+      const vagas = await vagasRestantes(
+        supabase,
+        taskId,
+        profileId,
+        task.categoria,
+        task.frequencia,
+        task.ocorrencias_por_dia
+      );
       if (vagas <= 0) {
         revalidatePath(`/app/${active.profileId}`);
         return;

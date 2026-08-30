@@ -16,7 +16,17 @@ export type PendingEvent = {
 };
 
 /** Fila de confirmação dos pais — atualiza sozinha via Supabase Realtime
- * assim que qualquer celular da família marca algo, sem precisar de F5. */
+ * assim que qualquer celular da família marca, cancela ou decide algo, sem
+ * precisar de F5.
+ *
+ * Para os avisos de DELETE (o menino cancelando o próprio pedido) chegarem
+ * aqui, as tabelas precisam estar com REPLICA IDENTITY FULL — senão o
+ * Postgres publica só a chave primária, o filtro por família não casa e o
+ * aviso é descartado. Ver supabase/009_realtime_delete_replica_identity.sql.
+ *
+ * Como rede de segurança — aparelho que dormiu, aba aberta há horas,
+ * conexão que caiu e voltou —, a tela também se atualiza quando volta a
+ * ficar visível. */
 export default function ConfirmQueue({
   familyId,
   events,
@@ -42,8 +52,16 @@ export default function ConfirmQueue({
       )
       .subscribe();
 
+    function aoVoltarParaTela() {
+      if (document.visibilityState === "visible") router.refresh();
+    }
+    document.addEventListener("visibilitychange", aoVoltarParaTela);
+    window.addEventListener("focus", aoVoltarParaTela);
+
     return () => {
       supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", aoVoltarParaTela);
+      window.removeEventListener("focus", aoVoltarParaTela);
     };
   }, [familyId, router]);
 

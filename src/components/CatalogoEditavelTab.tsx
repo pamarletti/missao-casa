@@ -316,10 +316,9 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
             obrigatórias realmente somam por mês — e quase sempre os dois ficam a alguns centavos de distância.
           </p>
           <p>
-            O motivo é que cada tarefa precisa ter um preço redondo em centavos, para o menino conseguir
-            entender e conferir o que ganhou. Ao dividir o total entre as tarefas, cada uma é arredondada para o
-            centavo mais próximo, e depois multiplicada pelas vezes que acontece no mês. A soma desses valores
-            arredondados raramente cai no número exato pedido: pede-se R$ 90,00 e a conta fecha em R$ 90,01.
+            Isso acontece porque cada tarefa precisa ter um preço redondo em centavos, para que fique mais fácil
+            que a criança entenda melhor o valor. Ao dividir o total entre as tarefas, cada uma é arredondada para
+            o centavo mais próximo. A soma desses valores arredondados raramente cai no número exato pedido.
           </p>
           <p>
             A diferença é sempre de centavos, e nunca some do bolso de ninguém — o que os meninos recebem é a

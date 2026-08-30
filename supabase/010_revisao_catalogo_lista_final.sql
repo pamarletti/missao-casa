@@ -27,6 +27,10 @@ update public.task_catalog set name = 'Fazer café da manhã para a família' wh
 update public.task_catalog set name = 'Fazer almoço para a família' where name = 'Fazer almoço';
 update public.task_catalog set name = 'Fazer jantar para a família' where name = 'Fazer jantar';
 update public.task_catalog set name = 'Preparar lanche para a família' where name = 'Preparar lanche coletivo';
+-- Esta renomeação já estava na migração 006, mas a tarefa continuou com o
+-- nome antigo no app — sinal de que a 006 não chegou a rodar em produção.
+-- Repetida aqui por garantia: se já tiver sido aplicada, não faz nada.
+update public.task_catalog set name = 'Tirar toalha de banho suja' where name = 'Tirar toalhas de banho';
 
 -- 2. Novos tempos: refeição para a família = 30 min (antes o café eram 15 e
 --    o almoço 40); lanche para a família = 15 min (antes 10). O valor

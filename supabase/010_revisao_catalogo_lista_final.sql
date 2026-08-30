@@ -31,6 +31,10 @@ update public.task_catalog set name = 'Preparar lanche para a família' where na
 -- nome antigo no app — sinal de que a 006 não chegou a rodar em produção.
 -- Repetida aqui por garantia: se já tiver sido aplicada, não faz nada.
 update public.task_catalog set name = 'Tirar toalha de banho suja' where name = 'Tirar toalhas de banho';
+update public.task_catalog set name = 'Colocar roupa suja no cesto' where name = 'Separar a roupa suja e colocar no cesto';
+update public.task_catalog set name = 'Guardar toalha limpa' where name = 'Guardar toalhas limpas';
+update public.task_catalog set name = 'Lavar toalha de banho' where name = 'Lavar toalhas de banho';
+update public.task_catalog set name = 'Organizar o guarda-roupa' where name = 'Organizar o guarda-roupa compartilhado';
 
 -- 2. Novos tempos: refeição para a família = 30 min (antes o café eram 15 e
 --    o almoço 40); lanche para a família = 15 min (antes 10). O valor
@@ -110,7 +114,7 @@ as $$
     (family_id, name, categoria, subcategoria, frequencia, tempo_min, nivel, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana)
   values
     (p_family_id, 'Arrumar a própria cama', 'individual', null, 'diaria', 3, 1, 0.20, 1, false),
-    (p_family_id, 'Separar a roupa suja e colocar no cesto', 'individual', null, 'diaria', 2, 1, 0.15, 1, false),
+    (p_family_id, 'Colocar roupa suja no cesto', 'individual', null, 'diaria', 2, 1, 0.15, 1, false),
     (p_family_id, 'Pendurar a própria toalha de banho', 'individual', null, 'diaria', 1, 1, 0.05, 1, false),
     (p_family_id, 'Guardar os próprios sapatos', 'individual', null, 'diaria', 2, 1, 0.15, 1, false),
     (p_family_id, 'Organizar brinquedos e objetos pessoais pela casa', 'individual', null, 'diaria', 5, 1, 0.35, 1, false),
@@ -121,14 +125,14 @@ as $$
     (p_family_id, 'Separar roupas para lavar', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
     (p_family_id, 'Guardar a própria roupa limpa no lugar', 'individual', null, 'semanal', 10, 1, 0.70, 1, false),
     (p_family_id, 'Manter o próprio skate e EPIs higienizados', 'individual', null, 'semanal', 10, 2, 0.85, 1, false),
-    (p_family_id, 'Lavar toalhas de banho', 'individual', null, 'semanal', 10, 2, 0.85, 1, false),
+    (p_family_id, 'Lavar toalha de banho', 'individual', null, 'semanal', 10, 2, 0.85, 1, false),
     (p_family_id, 'Tirar toalha de banho suja', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
-    (p_family_id, 'Guardar toalhas limpas', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
+    (p_family_id, 'Guardar toalha limpa', 'individual', null, 'semanal', 5, 1, 0.35, 1, false),
     (p_family_id, 'Limpar o próprio tênis', 'individual', null, 'semanal', 10, 1, 0.70, 1, false),
     (p_family_id, 'Manter o quarto arrumado no geral', 'individual_coletiva', null, 'diaria', 5, 1, 0.20, 1, false),
     (p_family_id, 'Abrir a janela', 'individual_coletiva', null, 'diaria', 1, 1, 0.05, 1, false),
     (p_family_id, 'Varrer e passar pano no chão do quarto', 'individual_coletiva', null, 'semanal', 10, 2, 0.45, 1, false),
-    (p_family_id, 'Organizar o guarda-roupa compartilhado', 'individual_coletiva', null, 'semanal', 15, 3, 0.75, 1, false),
+    (p_family_id, 'Organizar o guarda-roupa', 'individual_coletiva', null, 'semanal', 15, 3, 0.75, 1, false),
     (p_family_id, 'Organizar armário do quarto', 'individual_coletiva', null, 'semanal', 10, 2, 0.45, 1, false),
     (p_family_id, 'Organizar estante do quarto', 'individual_coletiva', null, 'semanal', 10, 1, 0.35, 1, false),
     (p_family_id, 'Fazer a lista de compras da feira/mercado', 'coletiva', 'Planejamento e compras', 'semanal', 10, 2, 0.85, 1, false),

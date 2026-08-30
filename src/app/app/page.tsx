@@ -80,7 +80,7 @@ export default async function ProfilePickerPage({
                     placeholder="PIN"
                     inputMode="numeric"
                     maxLength={4}
-                    autoComplete="current-password"
+                    tipo="pin"
                     autoFocus
                   />
                   <BotaoAcao className="btn-secondary w-full text-sm" carregando="entrando…">

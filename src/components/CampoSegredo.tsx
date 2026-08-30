@@ -36,6 +36,11 @@ type PropsCampo = {
   required?: boolean;
   autoComplete?: string;
   autoFocus?: boolean;
+  /** "senha" é uma senha de verdade, que a família QUER que o navegador
+   * guarde. "pin" é o contrário: não pode ser memorizado nem oferecido por
+   * gerenciador de senhas — é um segredo curto, de uso interno, que só faz
+   * sentido digitado na hora. */
+  tipo?: "senha" | "pin";
   /** Reportado ao componente de par, pra comparar os dois valores. */
   onValor?: (v: string) => void;
   refCampo?: React.RefObject<HTMLInputElement>;
@@ -51,16 +56,36 @@ export default function CampoSegredo({
   required,
   autoComplete,
   autoFocus,
+  tipo = "senha",
   onValor,
   refCampo,
 }: PropsCampo) {
   const [visivel, setVisivel] = useState(false);
+  const ehPin = tipo === "pin";
+
+  // Plano B para navegador antigo: se ele não souber mascarar um campo de
+  // texto por CSS, o PIN volta a ser type="password". Some a proteção
+  // contra o gerenciador de senhas, mas o PIN nunca aparece na tela — entre
+  // as duas coisas, esconder é a que não pode falhar. Começa em `true`
+  // porque hoje todos os navegadores atuais sabem fazer isso; a checagem só
+  // corrige o caso raro.
+  const [mascaraPorCss, setMascaraPorCss] = useState(true);
+  useEffect(() => {
+    if (!ehPin) return;
+    const suporta =
+      typeof CSS !== "undefined" &&
+      typeof CSS.supports === "function" &&
+      (CSS.supports("-webkit-text-security", "disc") || CSS.supports("text-security", "disc"));
+    setMascaraPorCss(suporta);
+  }, [ehPin]);
+
+  const comoTexto = ehPin && mascaraPorCss;
 
   return (
     <div className="relative">
       <input
         ref={refCampo}
-        type={visivel ? "text" : "password"}
+        type={visivel || comoTexto ? "text" : "password"}
         name={name}
         placeholder={placeholder}
         minLength={minLength}
@@ -68,10 +93,21 @@ export default function CampoSegredo({
         pattern={pattern}
         inputMode={inputMode}
         required={required}
-        autoComplete={autoComplete}
+        // Num PIN, dizer ao navegador para não completar E pedir a cada
+        // gerenciador conhecido que ignore o campo. Cada um tem o seu
+        // atributo próprio; não existe um que sirva para todos.
+        autoComplete={ehPin ? "off" : autoComplete}
+        {...(ehPin
+          ? {
+              "data-1p-ignore": "true",
+              "data-lpignore": "true",
+              "data-bwignore": "true",
+              "data-form-type": "other",
+            }
+          : {})}
         autoFocus={autoFocus}
         onChange={(e) => onValor?.(e.target.value)}
-        className="pr-11 w-full"
+        className={"pr-11 w-full" + (comoTexto && !visivel ? " mascarado" : "")}
       />
       <button
         type="button"

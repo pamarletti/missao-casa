@@ -36,6 +36,7 @@ export default function OnboardingPage({
                   pattern="[0-9]{4}"
                   maxLength={4}
                   required={n === 1}
+                  tipo="pin"
                   mensagemDivergencia="Os dois PINs precisam ser iguais."
                 />
               </div>

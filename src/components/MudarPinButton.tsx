@@ -36,7 +36,7 @@ export default function MudarPinButton({ profileId }: { profileId: string }) {
             inputMode="numeric"
             maxLength={4}
             required
-            autoComplete="current-password"
+            tipo="pin"
           />
           <ParDeSegredos
             name="novoPin"
@@ -46,7 +46,7 @@ export default function MudarPinButton({ profileId }: { profileId: string }) {
             pattern="[0-9]{4}"
             maxLength={4}
             required
-            autoComplete="new-password"
+            tipo="pin"
             mensagemDivergencia="Os dois PINs precisam ser iguais."
           />
           <BotaoAcao className="btn-primary text-sm w-full" carregando="salvando…">

@@ -82,7 +82,14 @@ function ItemEditavel({
         <span className="text-2xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
-        <button type="button" className="text-xs text-slate-500 underline mt-1" onClick={() => setEditando(true)}>
+        <button
+          type="button"
+          className="text-xs text-slate-500 underline mt-1"
+          onClick={() => {
+            setFinalidade(t.finalidade ?? "Para mim");
+            setEditando(true);
+          }}
+        >
           editar
         </button>
       </li>
@@ -91,7 +98,13 @@ function ItemEditavel({
 
   return (
     <li className="card p-3">
-      <form action={editarTarefa} className="flex flex-col gap-2">
+      <form
+        action={async (formData) => {
+          await editarTarefa(formData);
+          setEditando(false);
+        }}
+        className="flex flex-col gap-2"
+      >
         <input type="hidden" name="taskId" value={t.id} />
         <input name="name" defaultValue={t.name} className="text-sm" placeholder="Nome" required />
         <input
@@ -303,7 +316,7 @@ export default function CatalogoEditavelTab({
         chaveAba="catalogo-editavel"
         renderItem={(t) => (
           <ItemEditavel
-            key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}-${t.tipo ?? ""}-${t.comodo ?? ""}`}
+            key={t.id}
             t={t}
             comodos={comodos}
             criancas={criancas}

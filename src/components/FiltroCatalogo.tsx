@@ -16,10 +16,13 @@ export type TarefaFiltravel = {
   subcategoria: string | null;
 };
 
+/** Rótulos das categorias no painel do responsável (catálogo editável e
+ * filtro). O painel das crianças usa os próprios rótulos, mais diretos
+ * ("Suas tarefas", "Seu espaço compartilhado"). */
 export const CATEGORIA_LABEL: Record<string, string> = {
   individual: "Obrigatórias — individuais",
-  individual_coletiva: "Obrigatórias — do quarto (individual-coletivas)",
-  coletiva: "Coletivas (bônus)",
+  individual_coletiva: "Obrigatórias — compartilhadas",
+  coletiva: "Coletivas",
 };
 
 /** Ignora acento e maiúscula, pra "cafe" achar "Café" e vice-versa. */

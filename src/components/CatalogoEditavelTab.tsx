@@ -4,7 +4,7 @@ import { useState } from "react";
 import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[profileId]/actions";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalTotal } from "@/lib/valorBase";
-import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
+import { useFiltroCatalogo, ControlesCatalogo, CATEGORIA_LABEL } from "@/components/FiltroCatalogo";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
@@ -20,12 +20,6 @@ type Tarefa = {
   icone: string | null;
   /** false = "desnecessária": some das listas dos meninos e das Pendências. */
   ativo: boolean;
-};
-
-const CATEGORIA_LABEL: Record<string, string> = {
-  individual: "Obrigatórias — individuais",
-  individual_coletiva: "Obrigatórias — do quarto (individual-coletivas)",
-  coletiva: "Coletivas (bônus)",
 };
 
 // Obrigatórias sempre antes das coletivas (bônus), independente da ordem
@@ -239,10 +233,10 @@ export default function CatalogoEditavelTab({
       ))}
 
       <SecaoExpansivel
-        titulo="Tarefas desnecessárias"
+        titulo="Desnecessárias"
         contagem={desnecessarias.length}
-        aberta={estaAberta("Tarefas desnecessárias")}
-        onAlternar={() => alternar("Tarefas desnecessárias")}
+        aberta={estaAberta("Desnecessárias")}
+        onAlternar={() => alternar("Desnecessárias")}
       >
         <p className="text-sm text-slate-400 mb-3">
           Tarefas desligadas por enquanto: não aparecem para os meninos nem na fila de Pendências, e não contam no

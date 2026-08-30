@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signup } from "./actions";
 import { BotaoAcao } from "@/components/Carregando";
+import AvisoSenhaSimples from "@/components/AvisoSenhaSimples";
 
 export default function SignupPage({
   searchParams,
@@ -29,6 +30,8 @@ export default function SignupPage({
             Criar conta
           </BotaoAcao>
         </form>
+
+        <AvisoSenhaSimples />
 
         <p className="text-sm text-slate-400 text-center">
           Já tem conta?{" "}

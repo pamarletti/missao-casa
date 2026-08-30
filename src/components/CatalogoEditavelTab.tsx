@@ -269,7 +269,7 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
     <div className="card mb-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-slate-400 text-sm">Valor base mensal das tarefas obrigatórias</p>
+          <p className="text-slate-400 text-sm">Valor aproximado para cálculo das tarefas obrigatórias:</p>
           <p className="text-2xl font-bold text-casa-accent">R$ {totalAtual.toFixed(2)}</p>
           {Math.abs(totalAtual - Number(valorBaseAtual)) > 0.01 && (
             <p className="text-xs text-slate-500 mt-1">

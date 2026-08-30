@@ -72,6 +72,20 @@ function CampoCategoria({
   );
 }
 
+/** O parágrafo que aparece nos avisos de ligar/desligar uma tarefa, quando
+ * ela é obrigatória — em bônus não faz sentido, porque bônus não entra na
+ * soma das obrigatórias. */
+function EfeitoNoValorBase({ sai }: { sai: boolean }) {
+  return (
+    <p className="text-sm text-slate-300">
+      Como ela é obrigatória, o valor dela {sai ? "sai da" : "volta para a"} soma das tarefas obrigatórias, então o
+      valor base usado no cálculo vai {sai ? "baixar" : "subir"}. Para voltar ao valor base de antes, use
+      &ldquo;Mudar valor base&rdquo; — mas atenção: isso recalcula automaticamente o valor de todas as tarefas
+      obrigatórias.
+    </p>
+  );
+}
+
 function ItemEditavel({
   t,
   comodos,
@@ -99,6 +113,7 @@ function ItemEditavel({
   const [tipo, setTipo] = useState(tipoDa(t));
   const virouBonus = tipo === "Facultativa" && tipoDa(t) === "Obrigatória";
   const [avisandoTipo, setAvisandoTipo] = useState(false);
+  const [avisandoDesnecessaria, setAvisandoDesnecessaria] = useState(false);
   // Mexer no valor de uma tarefa de bônus não afeta o total das
   // obrigatórias, então ali o aviso seria falso.
   const ehObrigatoria = t.categoria === "individual" || t.categoria === "individual_coletiva";
@@ -310,15 +325,33 @@ function ItemEditavel({
       </form>
 
       <div className="mt-2 border-t border-slate-700/60 pt-2">
-        <BotaoDireto
-          className="text-xs text-slate-400 underline disabled:opacity-40"
+        <button
+          type="button"
+          className="text-xs text-slate-400 underline"
           title="Tira a tarefa das listas, sem apagar o histórico. Dá pra voltar depois."
-          carregando="tirando…"
-          acao={() => marcarDesnecessaria(t.id, true)}
+          onClick={() => setAvisandoDesnecessaria(true)}
         >
           tornar desnecessária
-        </BotaoDireto>
+        </button>
       </div>
+
+      {avisandoDesnecessaria && (
+        <JanelaAviso
+          titulo="Tornar desnecessária"
+          onFechar={() => setAvisandoDesnecessaria(false)}
+          acao={async () => {
+            await marcarDesnecessaria(t.id, true);
+            setAvisandoDesnecessaria(false);
+          }}
+        >
+          <p className="text-sm text-slate-300">
+            A tarefa sai das listas das crianças e da sua aba de Pendências. Nada é apagado: o que já foi feito
+            com ela continua no histórico e no saldo, e dá pra voltar a usar quando quiser, no bloco
+            &ldquo;Desnecessárias&rdquo; aqui embaixo.
+          </p>
+          {ehObrigatoria && <EfeitoNoValorBase sai />}
+        </JanelaAviso>
+      )}
     </li>
   );
 }
@@ -327,19 +360,39 @@ function ItemEditavel({
  * um botão pra voltar a valer. Nada é apagado — o que já foi feito com ela
  * continua no histórico e no saldo. */
 function ItemDesnecessario({ t }: { t: Tarefa }) {
+  const [avisando, setAvisando] = useState(false);
+  const ehObrigatoria = t.categoria === "individual" || t.categoria === "individual_coletiva";
+
   return (
     <li className="card p-3 flex flex-col items-center text-center gap-1 opacity-60">
       <span className="text-2xl grayscale">{iconeTarefa(t)}</span>
       <p className="font-medium text-sm leading-tight">{t.name}</p>
       <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
-      <BotaoDireto
-        className="text-xs text-casa-accent underline mt-1 disabled:opacity-40"
+      <button
+        type="button"
+        className="text-xs text-casa-accent underline mt-1"
         title="Voltar a usar esta tarefa"
-        carregando="voltando…"
-        acao={() => marcarDesnecessaria(t.id, false)}
+        onClick={() => setAvisando(true)}
       >
         voltar a usar
-      </BotaoDireto>
+      </button>
+
+      {avisando && (
+        <JanelaAviso
+          titulo="Voltar a usar"
+          onFechar={() => setAvisando(false)}
+          acao={async () => {
+            await marcarDesnecessaria(t.id, false);
+            setAvisando(false);
+          }}
+        >
+          <p className="text-sm text-slate-300">
+            A tarefa volta para as listas das crianças e para a sua aba de Pendências, valendo de novo a partir
+            de agora.
+          </p>
+          {ehObrigatoria && <EfeitoNoValorBase sai={false} />}
+        </JanelaAviso>
+      )}
     </li>
   );
 }

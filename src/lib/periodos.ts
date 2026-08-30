@@ -37,7 +37,9 @@ export function inicioDoMes(hojeISO: string): string {
 export function inicioDaJanela(frequencia: string, hojeISO: string): string {
   if (frequencia === "semanal") return inicioDaSemana(hojeISO);
   if (frequencia === "mensal") return inicioDoMes(hojeISO);
-  return hojeISO; // diária
+  // "não específica" cai aqui junto com a diária: ela é só de bônus, e nas
+  // de bônus a janela serve apenas pra saber se há um pedido em andamento.
+  return hojeISO;
 }
 
 /** Data ISO de N dias atrás — usado pra janelas móveis (ex.: os últimos

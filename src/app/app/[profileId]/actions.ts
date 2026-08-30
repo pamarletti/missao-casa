@@ -571,7 +571,7 @@ export async function marcarDesnecessaria(taskId: string, desnecessaria: boolean
  * banco; na tela ele aparece como "Bônus". */
 const TIPOS = ["Obrigatória", "Facultativa"];
 const FINALIDADES = ["Para mim", "Compartilhadas", "Para a família"];
-const FREQUENCIAS = ["diaria", "semanal", "mensal"];
+const FREQUENCIAS = ["diaria", "semanal", "mensal", "nao_especifica"];
 
 export async function editarTarefa(formData: FormData) {
   const active = await requireActiveProfile();
@@ -601,8 +601,38 @@ export async function editarTarefa(formData: FormData) {
   if (TIPOS.includes(tipo)) patch.tipo = tipo;
   if (FINALIDADES.includes(finalidade)) patch.finalidade = finalidade;
   if (comodo) patch.comodo = comodo;
+
+  // Classificação de antes, pra completar o que o formulário não mandou.
+  const { data: antes } = await supabase
+    .from("task_catalog")
+    .select("tipo, finalidade, frequencia")
+    .eq("id", taskId)
+    .single();
+  const tipoFinal = (patch.tipo as string) ?? antes?.tipo ?? "Obrigatória";
+
+  // "Não específica" é uma tarefa sem ritmo nenhum, feita quando der — e por
+  // isso só cabe no bônus. Uma obrigatória sem prazo não teria como ficar
+  // atrasada nem como entrar na conta do valor base, então a combinação é
+  // recusada aqui e a frequência de antes permanece.
+  if (frequencia === "nao_especifica" && tipoFinal !== "Facultativa") {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
   if (FREQUENCIAS.includes(frequencia)) {
     patch.frequencia = frequencia;
+
+    // Dia combinado: só existe em tarefa semanal. Nas outras a coluna é
+    // limpa, pra não sobrar um dia escondido de uma classificação anterior.
+    if (frequencia === "semanal") {
+      const dia = String(formData.get("dia_da_semana") || "").trim();
+      const numero = Number(dia);
+      patch.dia_da_semana =
+        dia !== "" && Number.isInteger(numero) && numero >= 0 && numero <= 6 ? numero : null;
+    } else {
+      patch.dia_da_semana = null;
+    }
+
     // "vezes por dia" só faz sentido em tarefa diária; nas outras volta a 1.
     if (frequencia !== "diaria") {
       patch.ocorrencias_por_dia = 1;
@@ -639,12 +669,6 @@ export async function editarTarefa(formData: FormData) {
   }
 
   if (patch.tipo || patch.finalidade) {
-    const { data: antes } = await supabase
-      .from("task_catalog")
-      .select("tipo, finalidade")
-      .eq("id", taskId)
-      .single();
-    const tipoFinal = (patch.tipo as string) ?? antes?.tipo ?? "Obrigatória";
     const finalFinal = (patch.finalidade as string) ?? antes?.finalidade ?? "Para mim";
     patch.categoria =
       tipoFinal === "Facultativa" ? "coletiva" : finalFinal === "Para mim" ? "individual" : "individual_coletiva";

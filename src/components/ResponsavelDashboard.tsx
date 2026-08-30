@@ -29,6 +29,8 @@ type Tarefa = {
   comodo: string | null;
   /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
   profile_ids: string[] | null;
+  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
+  dia_da_semana: number | null;
 };
 
 type Crianca = { id: string; name: string; icon?: string | null };

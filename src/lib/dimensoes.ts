@@ -13,6 +13,8 @@ export type TarefaClassificavel = {
   subcategoria?: string | null;
   frequencia: string;
   ocorrencias_por_dia?: number | null;
+  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
+  dia_da_semana?: number | null;
   tipo?: string | null;
   finalidade?: string | null;
   comodo?: string | null;
@@ -48,13 +50,39 @@ export function ehObrigatoria(t: TarefaClassificavel): boolean {
   return tipoDa(t) === "Obrigatória";
 }
 
+/** Nomes na ordem do getDay do JavaScript, que é a mesma da coluna
+ * task_catalog.dia_da_semana. */
+export const DIAS_DA_SEMANA = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+];
+
+/** "às segundas", "aos domingos" — o combinado da casa, escrito do jeito
+ * que se fala. Vazio quando a tarefa não tem dia marcado. */
+export function diaCombinadoLabel(t: TarefaClassificavel): string {
+  if (t.frequencia !== "semanal" || t.dia_da_semana == null) return "";
+  const nome = DIAS_DA_SEMANA[t.dia_da_semana];
+  if (!nome) return "";
+  if (nome === "domingo" || nome === "sábado") return `aos ${nome}s`;
+  return `às ${nome.replace("-feira", "s")}`;
+}
+
 export function frequenciaLabel(t: TarefaClassificavel): string {
   if (t.frequencia === "diaria") {
     const vezes = t.ocorrencias_por_dia || 1;
     return vezes > 1 ? `Diária (${vezes}× por dia)` : "Diária";
   }
-  if (t.frequencia === "semanal") return "Semanal";
+  if (t.frequencia === "semanal") {
+    const dia = diaCombinadoLabel(t);
+    return dia ? `Semanal (${dia})` : "Semanal";
+  }
   if (t.frequencia === "mensal") return "Mensal";
+  if (t.frequencia === "nao_especifica") return "Não específica";
   return t.frequencia;
 }
 

@@ -6,6 +6,7 @@ import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
 import { reais } from "@/lib/moeda";
+import { diaCombinadoLabel } from "@/lib/dimensoes";
 
 type Tarefa = {
   id: string;
@@ -18,6 +19,8 @@ type Tarefa = {
   finalidade: string | null;
   /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
   profile_ids: string[] | null;
+  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
+  dia_da_semana: number | null;
 };
 
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
@@ -201,6 +204,9 @@ export default function PendenciasTab({
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xl">{iconeTarefa(tarefa)}</span>
                   <p className="font-medium">{tarefa.name}</p>
+                  {diaCombinadoLabel(tarefa) && (
+                    <span className="text-xs text-sky-400">{diaCombinadoLabel(tarefa)}</span>
+                  )}
                   <span className="text-xs text-slate-400 ml-auto">
                     R$ {reais(Number(tarefa.valor_unitario))}
                   </span>

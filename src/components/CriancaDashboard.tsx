@@ -17,7 +17,7 @@ import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import ListaAgrupada from "@/components/ListaAgrupada";
 import ListaPorArea from "@/components/ListaPorArea";
-import { ehObrigatoria } from "@/lib/dimensoes";
+import { ehObrigatoria, diaCombinadoLabel } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import AtualizacaoAoVivo from "@/components/AtualizacaoAoVivo";
@@ -59,6 +59,8 @@ type Tarefa = {
   finalidade: string | null;
   comodo: string | null;
   profile_ids: string[] | null;
+  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
+  dia_da_semana: number | null;
 };
 
 type EventoMes = {
@@ -341,6 +343,9 @@ export default function CriancaDashboard({
             <span className="text-slate-500"> · {t.ocorrencias_por_dia}× por dia</span>
           )}
         </p>
+        {diaCombinadoLabel(t) && (
+          <p className="text-xs text-sky-400 leading-tight">{diaCombinadoLabel(t)}</p>
+        )}
 
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
           {total > 1 && (
@@ -901,15 +906,24 @@ export default function CriancaDashboard({
           </div>
 
           <Catalogo
-            tarefas={catalog.filter(
-              (t) =>
-                ehObrigatoria(t) &&
-                (ehMinhaVez(t) || passeiAdiante(t)) &&
-                t.frequencia === (periodo === "hoje" ? "diaria" : "semanal") &&
-                // Sexta e sábado não têm aula no dia seguinte: mochila e
-                // roupa da escola não valem nesses dias.
-                !(periodo === "hoje" && t.pula_fim_de_semana && ehSextaOuSabado)
-            )}
+            tarefas={catalog.filter((t) => {
+              if (!ehObrigatoria(t) || !(ehMinhaVez(t) || passeiAdiante(t))) return false;
+
+              if (periodo === "semana") return t.frequencia === "semanal";
+
+              // Em "Hoje" entram as diárias e também as semanais que têm
+              // este dia como o combinado da casa — elas continuam valendo
+              // a semana inteira (o prazo e a cota não mudam), mas hoje é o
+              // dia delas, e é hoje que precisam ser lembradas.
+              const ehDoDia =
+                t.frequencia === "diaria" ||
+                (t.frequencia === "semanal" && t.dia_da_semana === diaDaSemanaRecife);
+              if (!ehDoDia) return false;
+
+              // Sexta e sábado não têm aula no dia seguinte: mochila e
+              // roupa da escola não valem nesses dias.
+              return !(t.pula_fim_de_semana && ehSextaOuSabado);
+            })}
             aba={`obrigatorias:${periodo}`}
           />
         </>

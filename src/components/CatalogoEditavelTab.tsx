@@ -5,7 +5,7 @@ import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalPorCrianca } from "@/lib/valorBase";
 import ListaAgrupada from "@/components/ListaAgrupada";
-import { tipoDa } from "@/lib/dimensoes";
+import { tipoDa, DIAS_DA_SEMANA, diaCombinadoLabel } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { reais, paraCampo } from "@/lib/moeda";
@@ -28,6 +28,8 @@ type Tarefa = {
   comodo: string | null;
   /** Crianças que se revezam nesta tarefa. Nulo/vazio = todas. */
   profile_ids: string[] | null;
+  /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
+  dia_da_semana: number | null;
 };
 
 /** Traduz a tarefa para a opção de frequência que a tela mostra. */
@@ -124,6 +126,7 @@ function ItemEditavel({
         <span className="text-2xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
+        {diaCombinadoLabel(t) && <p className="text-xs text-sky-400">{diaCombinadoLabel(t)}</p>}
         <button
           type="button"
           className="text-xs text-slate-500 underline mt-1"
@@ -175,6 +178,12 @@ function ItemEditavel({
             valor={tipo}
             onChange={(v) => {
               setTipo(v);
+              // Obrigação sem prazo não é cobrável: ao voltar para
+              // "Obrigatória", uma tarefa que estava sem ritmo precisa
+              // escolher um. Semanal é o palpite mais brando.
+              if (v === "Obrigatória" && modoFrequencia === "nao_especifica") {
+                setModoFrequencia("semanal");
+              }
               // Só avisa na troca de verdade: voltar pro tipo original é
               // desfazer, não precisa de aviso nenhum.
               if (v !== tipoDa(t)) setAvisandoTipo(true);
@@ -231,9 +240,28 @@ function ItemEditavel({
               { value: "diaria_varias", label: "Diária, mais de uma vez por dia" },
               { value: "semanal", label: "Semanal" },
               { value: "mensal", label: "Mensal" },
+              // Só no bônus: uma tarefa sem ritmo nenhum, feita quando der.
+              // Numa obrigatória não haveria prazo pra cobrar nem quantas
+              // vezes por mês pra somar no valor base.
+              ...(tipo === "Facultativa"
+                ? [{ value: "nao_especifica", label: "Não específica (quando der)" }]
+                : []),
             ]}
           />
           <input type="hidden" name="frequencia" value={modoFrequencia === "diaria_varias" ? "diaria" : modoFrequencia} />
+
+          {modoFrequencia === "semanal" && (
+            <CampoCategoria
+              nome="dia_da_semana"
+              rotulo="Dia da semana"
+              valor={t.dia_da_semana == null ? "" : String(t.dia_da_semana)}
+              opcoes={[
+                { value: "", label: "Qualquer dia da semana" },
+                // Começa na segunda, que é como a semana do app começa.
+                ...[1, 2, 3, 4, 5, 6, 0].map((n) => ({ value: String(n), label: DIAS_DA_SEMANA[n] })),
+              ]}
+            />
+          )}
 
           {modoFrequencia === "diaria_varias" ? (
             <CampoCategoria

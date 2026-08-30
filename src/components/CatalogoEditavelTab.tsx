@@ -178,7 +178,8 @@ export default function CatalogoEditavelTab({
   const ativas = catalog.filter((t) => t.ativo);
   const desnecessarias = catalog.filter((t) => !t.ativo);
 
-  const { busca, setBusca, filtro, setFiltro, subcategorias, filtradas } = useFiltroCatalogo(catalog);
+  const { busca, setBusca, filtro, setFiltro, subcategorias, temDesnecessarias, filtradas } =
+    useFiltroCatalogo(catalog);
   const { abertas, alternar } = useSecoesExpansiveis();
 
   // Com busca ou filtro ativo, tudo aparece aberto — senão a pessoa
@@ -212,8 +213,9 @@ export default function CatalogoEditavelTab({
         filtro={filtro}
         setFiltro={setFiltro}
         subcategorias={subcategorias}
-        mostrando={ativasFiltradas.length}
-        total={ativas.length}
+        temDesnecessarias={temDesnecessarias}
+        mostrando={ativasFiltradas.length + desnecessariasFiltradas.length}
+        total={catalog.length}
       />
 
       {entradas.map(([titulo, tarefas]) => (

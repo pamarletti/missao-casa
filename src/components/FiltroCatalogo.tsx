@@ -14,6 +14,9 @@ export type TarefaFiltravel = {
   name: string;
   categoria: string;
   subcategoria: string | null;
+  /** false = desligada ("desnecessária"). Só o catálogo editável recebe
+   * tarefas desligadas; no painel das crianças vem tudo ativo. */
+  ativo?: boolean;
 };
 
 /** Rótulos das categorias no painel do responsável (catálogo editável e
@@ -37,6 +40,10 @@ export function useFiltroCatalogo<T extends TarefaFiltravel>(tarefas: T[]) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("");
 
+  // A opção "Desnecessárias" só faz sentido onde existem tarefas
+  // desligadas — ou seja, no catálogo editável do responsável.
+  const temDesnecessarias = useMemo(() => tarefas.some((t) => t.ativo === false), [tarefas]);
+
   const subcategorias = useMemo(() => {
     const encontradas = new Set<string>();
     for (const t of tarefas) if (t.subcategoria) encontradas.add(t.subcategoria);
@@ -46,6 +53,7 @@ export function useFiltroCatalogo<T extends TarefaFiltravel>(tarefas: T[]) {
   const filtradas = useMemo(() => {
     const termo = normalizar(busca.trim());
     return tarefas.filter((t) => {
+      if (filtro === "desnecessarias" && t.ativo !== false) return false;
       if (filtro.startsWith("cat:") && t.categoria !== filtro.slice(4)) return false;
       if (filtro.startsWith("sub:") && t.subcategoria !== filtro.slice(4)) return false;
       if (!termo) return true;
@@ -53,7 +61,7 @@ export function useFiltroCatalogo<T extends TarefaFiltravel>(tarefas: T[]) {
     });
   }, [tarefas, busca, filtro]);
 
-  return { busca, setBusca, filtro, setFiltro, subcategorias, filtradas };
+  return { busca, setBusca, filtro, setFiltro, subcategorias, temDesnecessarias, filtradas };
 }
 
 export function ControlesCatalogo({
@@ -62,6 +70,7 @@ export function ControlesCatalogo({
   filtro,
   setFiltro,
   subcategorias,
+  temDesnecessarias = false,
   mostrando,
   total,
 }: {
@@ -70,6 +79,7 @@ export function ControlesCatalogo({
   filtro: string;
   setFiltro: (v: string) => void;
   subcategorias: string[];
+  temDesnecessarias?: boolean;
   mostrando: number;
   total: number;
 }) {
@@ -97,6 +107,7 @@ export function ControlesCatalogo({
             <option value="cat:individual">{CATEGORIA_LABEL.individual}</option>
             <option value="cat:individual_coletiva">{CATEGORIA_LABEL.individual_coletiva}</option>
             <option value="cat:coletiva">{CATEGORIA_LABEL.coletiva}</option>
+            {temDesnecessarias && <option value="desnecessarias">Desnecessárias</option>}
           </optgroup>
           {subcategorias.length > 0 && (
             <optgroup label="Coletivas por área">

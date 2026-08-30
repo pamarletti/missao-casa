@@ -22,7 +22,16 @@ export default function EmojiButton({ profileId, iconeAtual }: { profileId: stri
       </button>
 
       {aberto && (
-        <form action={mudarIcone} className="mt-2 space-y-2 text-left">
+        <form
+          action={async (formData) => {
+            try {
+              await mudarIcone(formData);
+            } finally {
+              setAberto(false);
+            }
+          }}
+          className="mt-2 space-y-2 text-left"
+        >
           <input type="hidden" name="profileId" value={profileId} />
           <p className="text-xs text-slate-400">Escolha um emoji para o seu perfil</p>
           <input

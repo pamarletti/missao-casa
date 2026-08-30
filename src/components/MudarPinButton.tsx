@@ -18,7 +18,16 @@ export default function MudarPinButton({ profileId }: { profileId: string }) {
       </button>
 
       {aberto && (
-        <form action={mudarPin} className="mt-2 space-y-2 text-left">
+        <form
+          action={async (formData) => {
+            try {
+              await mudarPin(formData);
+            } finally {
+              setAberto(false);
+            }
+          }}
+          className="mt-2 space-y-2 text-left"
+        >
           <input type="hidden" name="profileId" value={profileId} />
           <input
             type="password"

@@ -283,7 +283,13 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
       </div>
 
       {aberto && (
-        <form action={definirValorBase} className="mt-3 space-y-2 border-t border-slate-700 pt-3">
+        <form
+          action={async (formData) => {
+            await definirValorBase(formData);
+            setAberto(false);
+          }}
+          className="mt-3 space-y-2 border-t border-slate-700 pt-3"
+        >
           <input type="hidden" name="familyId" value={familyId} />
           <p className="text-xs text-slate-400">
             Ao mudar esse valor, cada tarefa obrigatória é recalculada proporcionalmente para que a soma de todas

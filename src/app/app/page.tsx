@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { selectChildProfile, verifyPinAndSelect, logout } from "./actions";
 import { BotaoAcao } from "@/components/Carregando";
+import CampoSegredo from "@/components/CampoSegredo";
 
 const ICONS: Record<string, string> = { crianca: "🧒", responsavel: "🛡️" };
 
@@ -74,12 +75,12 @@ export default async function ProfilePickerPage({
                 </summary>
                 <form action={verifyPinAndSelect} className="mt-3 space-y-2">
                   <input type="hidden" name="profileId" value={p.id} />
-                  <input
-                    type="password"
+                  <CampoSegredo
                     name="pin"
                     placeholder="PIN"
                     inputMode="numeric"
                     maxLength={4}
+                    autoComplete="current-password"
                     autoFocus
                   />
                   <BotaoAcao className="btn-secondary w-full text-sm" carregando="entrando…">

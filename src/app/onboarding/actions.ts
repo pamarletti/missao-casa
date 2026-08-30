@@ -66,6 +66,14 @@ export async function completeOnboarding(formData: FormData) {
   for (const key of ["responsavel1", "responsavel2"]) {
     const nome = String(formData.get(`${key}_nome`) || "").trim();
     const pin = String(formData.get(`${key}_pin`) || "").trim();
+    const confirmacao = String(formData.get(`${key}_pin_confirmacao`) || "").trim();
+    // Mesma trava do lado do navegador, conferida de novo aqui: um PIN
+    // digitado errado só apareceria depois, na hora de entrar no perfil.
+    if (pin && pin !== confirmacao) {
+      redirect(
+        `/onboarding?erro=${encodeURIComponent(`Os dois PINs de ${nome || "um dos responsáveis"} não são iguais.`)}`
+      );
+    }
     if (nome && pin) {
       profiles.push({ family_id: family!.id, name: nome, kind: "responsavel", pin_hash: hashPin(pin) });
     }

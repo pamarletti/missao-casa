@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { login } from "./actions";
 import { BotaoAcao } from "@/components/Carregando";
+import CampoSegredo from "@/components/CampoSegredo";
 
 export default function LoginPage({
   searchParams,
@@ -28,7 +29,7 @@ export default function LoginPage({
 
         <form action={login} className="space-y-3">
           <input type="email" name="email" placeholder="E-mail da família" required />
-          <input type="password" name="password" placeholder="Senha" required />
+          <CampoSegredo name="password" placeholder="Senha" required autoComplete="current-password" />
           <BotaoAcao className="btn-primary w-full" carregando="entrando…">
             Entrar
           </BotaoAcao>

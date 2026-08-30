@@ -1,5 +1,6 @@
 import { completeOnboarding } from "./actions";
 import OnboardingForm from "./OnboardingForm";
+import { ParDeSegredos } from "@/components/CampoSegredo";
 
 export default function OnboardingPage({
   searchParams,
@@ -24,16 +25,18 @@ export default function OnboardingPage({
           <fieldset className="space-y-3">
             <legend className="font-semibold text-casa-accent">Responsáveis</legend>
             {[1, 2].map((n) => (
-              <div key={n} className="grid grid-cols-2 gap-2">
+              <div key={n} className="space-y-2 rounded-xl border border-slate-700/60 p-3">
                 <input name={`responsavel${n}_nome`} placeholder={`Nome (ex.: Mãe)`} required={n === 1} />
-                <input
-                  type="password"
+                <ParDeSegredos
                   name={`responsavel${n}_pin`}
+                  nomeConfirmacao={`responsavel${n}_pin_confirmacao`}
                   placeholder="PIN de 4 dígitos"
+                  placeholderConfirmacao="Repita o PIN"
                   inputMode="numeric"
                   pattern="[0-9]{4}"
                   maxLength={4}
                   required={n === 1}
+                  mensagemDivergencia="Os dois PINs precisam ser iguais."
                 />
               </div>
             ))}

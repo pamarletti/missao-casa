@@ -1,5 +1,6 @@
 import { resetPassword } from "./actions";
 import { BotaoAcao } from "@/components/Carregando";
+import { ParDeSegredos } from "@/components/CampoSegredo";
 
 export default function ResetPasswordPage({
   searchParams,
@@ -15,8 +16,15 @@ export default function ResetPasswordPage({
         {searchParams.erro && <p className="text-red-400 text-sm text-center">{searchParams.erro}</p>}
 
         <form action={resetPassword} className="space-y-3">
-          <input type="password" name="password" placeholder="Nova senha" minLength={6} required />
-          <input type="password" name="confirmacao" placeholder="Confirme a nova senha" minLength={6} required />
+          <ParDeSegredos
+            name="password"
+            placeholder="Nova senha"
+            placeholderConfirmacao="Confirme a nova senha"
+            minLength={6}
+            required
+            autoComplete="new-password"
+            mensagemDivergencia="As duas senhas precisam ser iguais."
+          />
           <BotaoAcao className="btn-primary w-full" carregando="salvando…">
             Salvar nova senha
           </BotaoAcao>

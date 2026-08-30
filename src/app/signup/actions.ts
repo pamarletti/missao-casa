@@ -7,6 +7,13 @@ export async function signup(formData: FormData) {
   const familyName = String(formData.get("familyName") || "Minha família");
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
+  const confirmacao = String(formData.get("confirmacao") || "");
+
+  // O navegador já barra isso pelo campo de confirmação, mas quem decide é
+  // o servidor: um formulário pode chegar aqui por outro caminho.
+  if (password !== confirmacao) {
+    redirect(`/signup?erro=${encodeURIComponent("As duas senhas precisam ser iguais.")}`);
+  }
 
   const supabase = createClient();
 

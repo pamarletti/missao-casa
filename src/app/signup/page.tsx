@@ -2,6 +2,7 @@ import Link from "next/link";
 import { signup } from "./actions";
 import { BotaoAcao } from "@/components/Carregando";
 import AvisoSenhaSimples from "@/components/AvisoSenhaSimples";
+import { ParDeSegredos } from "@/components/CampoSegredo";
 
 export default function SignupPage({
   searchParams,
@@ -25,7 +26,15 @@ export default function SignupPage({
         <form action={signup} className="space-y-3">
           <input name="familyName" placeholder="Nome da família (ex.: Família Silva)" required />
           <input type="email" name="email" placeholder="Seu e-mail" required />
-          <input type="password" name="password" placeholder="Crie uma senha" minLength={6} required />
+          <ParDeSegredos
+            name="password"
+            placeholder="Crie uma senha"
+            placeholderConfirmacao="Repita a senha"
+            minLength={6}
+            required
+            autoComplete="new-password"
+            mensagemDivergencia="As duas senhas precisam ser iguais."
+          />
           <BotaoAcao className="btn-primary w-full" carregando="criando conta…">
             Criar conta
           </BotaoAcao>

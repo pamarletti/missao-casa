@@ -9,6 +9,7 @@ import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
+import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
@@ -123,6 +124,8 @@ export default function CriancaDashboard({
     subcategorias: subcategoriasCatalogo,
     filtradas: catalogoFiltrado,
   } = useFiltroCatalogo(catalog);
+  const { abertas: secoesAbertas, alternar: alternarSecao } = useSecoesExpansiveis();
+  const filtrandoCatalogo = buscaCatalogo.trim() !== "" || filtroCatalogo !== "";
 
   // Relógio ao vivo (atualiza a cada 30s) pra contagem regressiva do fim do
   // dia e do fim da semana funcionar sozinha na tela, sem precisar recarregar.
@@ -193,7 +196,15 @@ export default function CriancaDashboard({
     );
   }
 
-  function Catalogo({ tarefas, agruparPor }: { tarefas: Tarefa[]; agruparPor: "categoria" | "subcategoria" }) {
+  function Catalogo({
+    tarefas,
+    agruparPor,
+    expansivel = false,
+  }: {
+    tarefas: Tarefa[];
+    agruparPor: "categoria" | "subcategoria";
+    expansivel?: boolean;
+  }) {
     if (tarefas.length === 0) return <p className="text-slate-400 text-sm">Nada por aqui.</p>;
 
     const grupos = new Map<string, Tarefa[]>();
@@ -214,16 +225,36 @@ export default function CriancaDashboard({
 
     return (
       <>
-        {entradas.map(([titulo, tarefasDoGrupo]) => (
-          <section key={titulo} className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+        {entradas.map(([titulo, tarefasDoGrupo]) => {
+          const lista = (
             <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {tarefasDoGrupo.map((t) => (
                 <TarefaRow key={t.id} t={t} />
               ))}
             </ul>
-          </section>
-        ))}
+          );
+
+          if (!expansivel) {
+            return (
+              <section key={titulo} className="mb-6">
+                <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+                {lista}
+              </section>
+            );
+          }
+
+          return (
+            <SecaoExpansivel
+              key={titulo}
+              titulo={titulo}
+              contagem={tarefasDoGrupo.length}
+              aberta={filtrandoCatalogo || secoesAbertas.has(titulo)}
+              onAlternar={() => alternarSecao(titulo)}
+            >
+              {lista}
+            </SecaoExpansivel>
+          );
+        })}
       </>
     );
   }
@@ -567,7 +598,7 @@ export default function CriancaDashboard({
             mostrando={catalogoFiltrado.length}
             total={catalog.length}
           />
-          <Catalogo tarefas={catalogoFiltrado} agruparPor="categoria" />
+          <Catalogo tarefas={catalogoFiltrado} agruparPor="categoria" expansivel />
         </>
       )}
 

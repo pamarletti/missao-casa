@@ -6,6 +6,7 @@ import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalTotal } from "@/lib/valorBase";
 import CancelarContaButton from "@/components/CancelarContaButton";
 import { useFiltroCatalogo, ControlesCatalogo } from "@/components/FiltroCatalogo";
+import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
 type Tarefa = {
@@ -185,6 +186,12 @@ export default function CatalogoEditavelTab({
   const desnecessarias = catalog.filter((t) => !t.ativo);
 
   const { busca, setBusca, filtro, setFiltro, subcategorias, filtradas } = useFiltroCatalogo(catalog);
+  const { abertas, alternar } = useSecoesExpansiveis();
+
+  // Com busca ou filtro ativo, tudo aparece aberto — senão a pessoa
+  // procuraria uma tarefa e veria só títulos fechados.
+  const filtrando = busca.trim() !== "" || filtro !== "";
+  const estaAberta = (chave: string) => filtrando || abertas.has(chave);
   const ativasFiltradas = filtradas.filter((t) => t.ativo);
   const desnecessariasFiltradas = filtradas.filter((t) => !t.ativo);
 
@@ -217,18 +224,27 @@ export default function CatalogoEditavelTab({
       />
 
       {entradas.map(([titulo, tarefas]) => (
-        <section key={titulo} className="mb-6">
-          <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+        <SecaoExpansivel
+          key={titulo}
+          titulo={titulo}
+          contagem={tarefas.length}
+          aberta={estaAberta(titulo)}
+          onAlternar={() => alternar(titulo)}
+        >
           <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {tarefas.map((t) => (
               <ItemEditavel key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}`} t={t} />
             ))}
           </ul>
-        </section>
+        </SecaoExpansivel>
       ))}
 
-      <section className="mb-6 border-t border-slate-700/60 pt-6">
-        <h2 className="text-lg font-semibold">Tarefas desnecessárias</h2>
+      <SecaoExpansivel
+        titulo="Tarefas desnecessárias"
+        contagem={desnecessarias.length}
+        aberta={estaAberta("Tarefas desnecessárias")}
+        onAlternar={() => alternar("Tarefas desnecessárias")}
+      >
         <p className="text-sm text-slate-400 mb-3">
           Tarefas desligadas por enquanto: não aparecem para os meninos nem na fila de Pendências, e não contam no
           valor base do mês. Nada foi apagado — o que já foi feito continua no histórico, e é só clicar em &ldquo;voltar
@@ -250,7 +266,7 @@ export default function CatalogoEditavelTab({
             ))}
           </ul>
         )}
-      </section>
+      </SecaoExpansivel>
 
       <section className="mt-10 pt-6 border-t border-slate-700/60">
         <h2 className="text-lg font-semibold mb-3 text-slate-400">Zona de perigo</h2>

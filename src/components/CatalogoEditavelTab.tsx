@@ -266,7 +266,12 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
   const obrigatorias = catalog.filter((t) => t.categoria === "individual" || t.categoria === "individual_coletiva");
   const totalAtual = valorMensalTotal(obrigatorias);
   const registrado = Number(valorBaseAtual);
-  const diferente = Math.abs(totalAtual - registrado) > 0.005;
+  const distancia = totalAtual - registrado;
+  // Alguns centavos são o arredondamento de sempre (ver o texto do "i").
+  // Acima disso, alguém mexeu no valor de uma tarefa, ou ligou/desligou uma
+  // obrigatória — e aí não é arredondamento, é a família fora do alvo.
+  const saiuDoAlvo = Math.abs(distancia) > 0.1;
+  const diferente = Math.abs(distancia) > 0.005;
 
   return (
     <div className="card mb-6">
@@ -286,10 +291,17 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
               i
             </button>
           </p>
-          {diferente && (
-            <p className="text-xs text-slate-500 mt-1">
-              (valor base registrado: R$ {registrado.toFixed(2)})
+          {saiuDoAlvo ? (
+            <p className="text-xs text-amber-400 mt-1">
+              Você saiu do seu alvo de R$ {registrado.toFixed(2)} — está R$ {Math.abs(distancia).toFixed(2)}{" "}
+              {distancia > 0 ? "acima" : "abaixo"}. Para voltar, use &ldquo;Mudar valor base&rdquo;.
             </p>
+          ) : (
+            diferente && (
+              <p className="text-xs text-slate-500 mt-1">
+                (valor base registrado: R$ {registrado.toFixed(2)})
+              </p>
+            )
           )}
         </div>
         <button type="button" className="btn-secondary text-sm shrink-0" onClick={() => setAberto((v) => !v)}>
@@ -312,6 +324,12 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
           <p>
             A diferença é sempre de centavos, e nunca some do bolso de ninguém — o que os meninos recebem é a
             soma real, o valor grande.
+          </p>
+          <p>
+            O valor registrado só muda quando você define um novo, aqui em &ldquo;Mudar valor base&rdquo;. Se
+            você editar o preço de uma tarefa, ou tornar uma obrigatória desnecessária, a soma real se afasta do
+            alvo e aparece um aviso — assim dá pra perceber na hora que a família saiu do combinado, em vez de o
+            alvo escorregar junto sem ninguém notar.
           </p>
         </div>
       )}

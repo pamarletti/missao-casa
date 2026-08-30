@@ -469,35 +469,11 @@ export async function marcarDesnecessaria(taskId: string, desnecessaria: boolean
   const supabase = createClient();
   await supabase.from("task_catalog").update({ ativo: !desnecessaria }).eq("id", taskId);
 
-  const { data: tarefa } = await supabase
-    .from("task_catalog")
-    .select("family_id, categoria")
-    .eq("id", taskId)
-    .single();
-
-  if (tarefa && (tarefa.categoria === "individual" || tarefa.categoria === "individual_coletiva")) {
-    const { data: obrigatorias } = await supabase
-      .from("task_catalog")
-      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana, finalidade, profile_ids")
-      .eq("family_id", tarefa.family_id)
-      .in("categoria", ["individual", "individual_coletiva"])
-      .eq("ativo", true);
-
-    const { count: numCriancasRaw } = await supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("family_id", tarefa.family_id)
-      .eq("kind", "crianca");
-
-    // Teto de UMA criança: as compartilhadas entram pela fração que cabe a
-    // cada uma, já que elas se revezam.
-    const novoTotal = valorMensalPorCrianca(obrigatorias ?? [], numCriancasRaw && numCriancasRaw > 0 ? numCriancasRaw : 1);
-    await supabase
-      .from("families")
-      .update({ valor_base_obrigatorias: Math.round(novoTotal * 100) / 100 })
-      .eq("id", tarefa.family_id);
-  }
-
+  // O "valor base" da família NÃO é recalculado aqui de propósito: ele é o
+  // alvo que o responsável escolheu, e só muda quando ele escolhe outro (em
+  // definirValorBase). Desligar uma obrigatória faz a soma real cair, e o
+  // card do catálogo passa a avisar que a família saiu do alvo — que é
+  // justamente a informação útil.
   revalidatePath(`/app/${active.profileId}`);
 }
 
@@ -587,37 +563,11 @@ export async function editarTarefa(formData: FormData) {
 
   await supabase.from("task_catalog").update(patch).eq("id", taskId);
 
-  const { data: tarefaEditada } = await supabase
-    .from("task_catalog")
-    .select("family_id")
-    .eq("id", taskId)
-    .single();
-
-  // Recalcula sempre: mudar valor, frequência ou o tipo de uma tarefa muda a
-  // soma real das obrigatórias, pra qualquer lado.
-  if (tarefaEditada) {
-    const { data: obrigatorias } = await supabase
-      .from("task_catalog")
-      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana, finalidade, profile_ids")
-      .eq("family_id", tarefaEditada.family_id)
-      .in("categoria", ["individual", "individual_coletiva"])
-      .eq("ativo", true);
-
-    const { count: numCriancasRaw } = await supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("family_id", tarefaEditada.family_id)
-      .eq("kind", "crianca");
-
-    // Teto de UMA criança: as compartilhadas entram pela fração que cabe a
-    // cada uma, já que elas se revezam.
-    const novoTotal = valorMensalPorCrianca(obrigatorias ?? [], numCriancasRaw && numCriancasRaw > 0 ? numCriancasRaw : 1);
-    await supabase
-      .from("families")
-      .update({ valor_base_obrigatorias: Math.round(novoTotal * 100) / 100 })
-      .eq("id", tarefaEditada.family_id);
-  }
-
+  // Mesma regra de marcarDesnecessaria: o alvo mensal da família não é
+  // reescrito aqui. Mexer no valor (ou na frequência, ou no tipo) de uma
+  // tarefa muda a soma real das obrigatórias, e é o card do catálogo que
+  // mostra essa distância — em vez de o alvo escorregar junto, sem ninguém
+  // perceber que saiu do combinado.
   revalidatePath(`/app/${active.profileId}`);
 }
 

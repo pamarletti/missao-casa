@@ -150,20 +150,39 @@ export default function CriancaDashboard({
     return relevantes[relevantes.length - 1];
   }
 
+  /** A tarefa ainda aceita ser marcada nesta janela? Vale para quem nunca
+   * marcou nada e também para quem ficou como "não feito" ou "pedido para
+   * refazer" — enquanto o dia (ou a semana) não virar, ainda dá tempo. */
+  function aindaDaTempo(t: Tarefa) {
+    const evento = statusAtual(t.id, t.frequencia);
+    return !evento || evento.status === "nao_feito" || evento.status === "pedido_para_refazer";
+  }
+
   function TarefaRow({ t }: { t: Tarefa }) {
     const evento = statusAtual(t.id, t.frequencia);
+    // "Não feito" e "pedido para refazer" não trancam a tarefa: enquanto o
+    // dia (ou a semana) não virar, ainda dá tempo — o botão volta e ela
+    // pode ser marcada de novo, como se nada tivesse acontecido.
+    const podeTentarDeNovo =
+      evento?.status === "nao_feito" || evento?.status === "pedido_para_refazer";
+    const livre = !evento || podeTentarDeNovo;
     return (
       <li className="card p-3 flex flex-col items-center text-center gap-1 h-full">
         <span className="text-3xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
-          {!evento && t.categoria !== "coletiva" && (
+          {podeTentarDeNovo && (
+            <span className="text-xs text-amber-400">
+              {evento?.status === "nao_feito" ? "não feito — ainda dá tempo!" : "pedido para refazer"}
+            </span>
+          )}
+          {livre && t.categoria !== "coletiva" && (
             <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
               <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
             </form>
           )}
-          {!evento && t.categoria === "coletiva" && (
+          {livre && t.categoria === "coletiva" && (
             <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
               <BotaoAcao className="btn-secondary text-xs w-full">Quero fazer</BotaoAcao>
             </form>
@@ -187,10 +206,6 @@ export default function CriancaDashboard({
             </>
           )}
           {evento?.status === "confirmado" && <span className="text-xs text-green-400">confirmado ✓</span>}
-          {evento?.status === "nao_feito" && <span className="text-xs text-red-400">não feito</span>}
-          {evento?.status === "pedido_para_refazer" && (
-            <span className="text-xs text-amber-400">pedido para refazer</span>
-          )}
         </div>
       </li>
     );
@@ -328,20 +343,16 @@ export default function CriancaDashboard({
 
   // Quanto vai ser descontado se as obrigatórias de hoje/desta semana
   // continuarem sem nenhuma marcação até o prazo — mesma regra de
-  // "silêncio total" da rotina automática (qualquer marcação já feita,
-  // mesmo "não feito", tira a tarefa dessa lista). Tarefas que não valem
+  // ainda não foram feitas — inclusive as marcadas como "não feito", que
+  // continuam valendo enquanto a janela não virar. Tarefas que não valem
   // hoje (sexta/sábado, pra quem pula fim de semana) nunca entram aqui.
-  const diariasEmRisco = obrigatoriasHoje.filter(
-    (t) => t.frequencia === "diaria" && !statusAtual(t.id, t.frequencia)
-  );
+  const diariasEmRisco = obrigatoriasHoje.filter((t) => t.frequencia === "diaria" && aindaDaTempo(t));
   const valorEmRiscoHoje = diariasEmRisco.reduce(
     (acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1),
     0
   );
 
-  const semanaisEmRisco = obrigatorias.filter(
-    (t) => t.frequencia === "semanal" && !statusAtual(t.id, t.frequencia)
-  );
+  const semanaisEmRisco = obrigatorias.filter((t) => t.frequencia === "semanal" && aindaDaTempo(t));
   const valorEmRiscoSemana = semanaisEmRisco.reduce((acc, t) => acc + Number(t.valor_unitario), 0);
 
   // "Tem um tempinho?": até 4 sugestões de tarefas rápidas pra fazer agora,
@@ -351,7 +362,7 @@ export default function CriancaDashboard({
   // "Feito" — nunca as que já foram feitas ou já estão decididas.
   const coletivasSugeridas = coletivas.filter((t) => {
     const evento = statusAtual(t.id, t.frequencia);
-    return !evento || evento.status === "liberada";
+    return aindaDaTempo(t) || evento?.status === "liberada";
   });
   const sugestoesTempinho = [...diariasEmRisco, ...semanaisEmRisco, ...coletivasSugeridas].slice(0, 4);
 

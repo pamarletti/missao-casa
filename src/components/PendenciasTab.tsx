@@ -27,6 +27,12 @@ export type Atrasada = { data: string; taskId: string; profileId: string };
  * de Pendências até ele decidir, com um botão pra resolver ali mesmo. */
 const ESPERANDO_DECISAO = ["aguardando_confirmacao", "aguardando_autorizacao"];
 
+/** Marcar como não feita (ou pedir pra refazer) não fecha o assunto:
+ * enquanto o dia (ou a semana) não virar, ainda dá tempo de fazer. A
+ * tarefa segue na lista com os botões ✓/✗ disponíveis, então dá pra
+ * mudar de ideia — inclusive pra corrigir um ✗ clicado por engano. */
+const AINDA_DA_TEMPO = ["nao_feito", "pedido_para_refazer"];
+
 const STATUS_LABEL: Record<string, string> = {
   aguardando_autorizacao: "aguardando autorização",
   liberada: "liberada",
@@ -34,7 +40,8 @@ const STATUS_LABEL: Record<string, string> = {
   confirmado: "confirmado ✓",
   nao_feito: "não feito",
   pedido_para_refazer: "pedido para refazer",
-  desconto_automatico: "descontado",
+  desconto_automatico: "não feito — descontado",
+  desconsiderada: "desconsiderada",
 };
 
 /** Pendências de hoje/semana — mesma regra de "silêncio total" usada no
@@ -79,7 +86,12 @@ export default function PendenciasTab({
         porFilho: criancas.map((c) => ({ crianca: c, evento: statusDoFilho(t.id, t.frequencia, c.id) })),
       }))
       .filter((linha) =>
-        linha.porFilho.some((pf) => !pf.evento || ESPERANDO_DECISAO.includes(pf.evento.status))
+        linha.porFilho.some(
+          (pf) =>
+            !pf.evento ||
+            ESPERANDO_DECISAO.includes(pf.evento.status) ||
+            AINDA_DA_TEMPO.includes(pf.evento.status)
+        )
       );
 
     return (
@@ -103,8 +115,13 @@ export default function PendenciasTab({
                   {porFilho.map(({ crianca, evento }) => (
                     <li key={crianca.id} className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
                       <span className="text-sm">{crianca.name}</span>
-                      {!evento ? (
-                        <div className="flex gap-1.5">
+                      {!evento || AINDA_DA_TEMPO.includes(evento.status) ? (
+                        <div className="flex items-center gap-1.5">
+                          {evento && (
+                            <span className="text-xs text-amber-400 mr-1">
+                              {evento.status === "nao_feito" ? "não feito" : "refazer"}
+                            </span>
+                          )}
                           <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "feito")}>
                             <BotaoAcao className="btn-primary text-xs px-2 py-0.5" title="Marcar feito">
                               ✓

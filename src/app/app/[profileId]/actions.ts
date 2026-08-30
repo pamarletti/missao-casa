@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveProfile, clearActiveProfile } from "@/lib/activeProfile";
 import { valorMensalTotal } from "@/lib/valorBase";
+import { inicioDaJanela } from "@/lib/periodos";
 
 async function requireActiveProfile() {
   const active = await getActiveProfile();
@@ -47,27 +48,72 @@ export async function cancelarContaFamilia() {
 
 /** Menino marca uma tarefa individual/individual-coletiva como feita,
  * ou pede autorização para uma coletiva. */
+/** "Não feito" e "pedido para refazer" não trancam a tarefa: enquanto a
+ * janela dela não virar (o dia, pra diárias; a semana, pra semanais) ainda
+ * dá tempo de fazer, e a tarefa volta a aceitar marcação como se nada
+ * tivesse acontecido. Esta função acha o registro daquela janela pra ser
+ * reaproveitado — atualizamos a linha existente em vez de criar uma
+ * segunda pra mesma tarefa no mesmo dia, senão o app não teria como saber
+ * qual das duas vale. Quando a janela vira, o registro sai de vista
+ * sozinho e a tarefa começa do zero. */
+async function eventoParaRefazer(
+  supabase: ReturnType<typeof createClient>,
+  taskId: string,
+  profileId: string,
+  frequencia: string
+) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const janela = inicioDaJanela(frequencia, hoje);
+
+  const { data } = await supabase
+    .from("task_events")
+    .select("id")
+    .eq("task_id", taskId)
+    .eq("profile_id", profileId)
+    .gte("data", janela)
+    .in("status", ["nao_feito", "pedido_para_refazer"])
+    .order("data", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.id ?? null;
+}
+
 export async function markOrRequest(taskId: string, familyId: string) {
   const active = await requireActiveProfile();
   const supabase = createClient();
 
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("categoria, valor_unitario")
+    .select("categoria, valor_unitario, frequencia")
     .eq("id", taskId)
     .single();
   if (!task) return;
 
   const status = task.categoria === "coletiva" ? "aguardando_autorizacao" : "aguardando_confirmacao";
+  const idParaRefazer = await eventoParaRefazer(supabase, taskId, active.profileId, task.frequencia);
 
-  await supabase.from("task_events").insert({
-    family_id: familyId,
-    task_id: taskId,
-    profile_id: active.profileId,
-    status,
-    valor: task.valor_unitario,
-    origem: "menino",
-  });
+  if (idParaRefazer) {
+    await supabase
+      .from("task_events")
+      .update({
+        status,
+        valor: task.valor_unitario,
+        origem: "menino",
+        confirmado_por: null,
+        confirmado_em: null,
+      })
+      .eq("id", idParaRefazer);
+  } else {
+    await supabase.from("task_events").insert({
+      family_id: familyId,
+      task_id: taskId,
+      profile_id: active.profileId,
+      status,
+      valor: task.valor_unitario,
+      origem: "menino",
+    });
+  }
 
   revalidatePath(`/app/${active.profileId}`);
 }
@@ -172,22 +218,39 @@ export async function registrarDireto(
   const supabase = createClient();
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("valor_unitario")
+    .select("valor_unitario, frequencia")
     .eq("id", taskId)
     .single();
   if (!task) return;
 
+  // Se a tarefa já tinha sido marcada como não feita (ou pedida pra
+  // refazer) nesta mesma janela, corrige aquele registro em vez de criar
+  // um segundo — ver eventoParaRefazer, mais acima.
+  const idParaRefazer = await eventoParaRefazer(supabase, taskId, profileId, task.frequencia);
+
   if (decisao === "feito") {
-    await supabase.from("task_events").insert({
-      family_id: familyId,
-      task_id: taskId,
-      profile_id: profileId,
+    const dadosFeito = {
       status: "confirmado",
       valor: task.valor_unitario,
       origem: "responsavel",
       confirmado_por: active.profileId,
       confirmado_em: new Date().toISOString(),
-    });
+    };
+
+    if (idParaRefazer) {
+      await supabase.from("task_events").update(dadosFeito).eq("id", idParaRefazer);
+    } else {
+      await supabase.from("task_events").insert({
+        family_id: familyId,
+        task_id: taskId,
+        profile_id: profileId,
+        ...dadosFeito,
+      });
+    }
+  } else if (idParaRefazer) {
+    // Já estava como não feita nesta janela — nada muda.
+    revalidatePath(`/app/${active.profileId}`);
+    return;
   } else {
     await supabase.from("task_events").insert({
       family_id: familyId,

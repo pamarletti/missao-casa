@@ -40,7 +40,8 @@ const STATUS_LABEL: Record<string, string> = {
   confirmado: "confirmado",
   nao_feito: "não feito",
   pedido_para_refazer: "pedido para refazer",
-  desconto_automatico: "desconto automático",
+  desconto_automatico: "não feito — descontado",
+  desconsiderada: "desconsiderada",
 };
 
 export default async function Dashboard({

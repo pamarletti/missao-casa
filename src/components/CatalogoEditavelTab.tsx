@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[profileId]/actions";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalPorCrianca } from "@/lib/valorBase";
@@ -9,6 +9,7 @@ import { tipoDa } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { reais, paraCampo } from "@/lib/moeda";
+import JanelaAviso from "@/components/JanelaAviso";
 
 type Tarefa = {
   id: string;
@@ -86,6 +87,16 @@ function ItemEditavel({
   // aparecer o campo de quantas vezes. No banco continua frequencia
   // "diaria" + ocorrencias_por_dia.
   const [modoFrequencia, setModoFrequencia] = useState(modoDe(t));
+  // Aviso do campo de valor: aparece na primeira vez que a pessoa encosta
+  // nele, e só uma vez por edição — repetir a cada clique viraria estorvo.
+  const [avisandoValor, setAvisandoValor] = useState(false);
+  const [jaAvisou, setJaAvisou] = useState(false);
+  // Pra devolver o cursor ao campo depois do "Entendi" — senão a pessoa
+  // clica no valor, lê o aviso, fecha e descobre que precisa clicar de novo.
+  const campoValorRef = useRef<HTMLInputElement>(null);
+  // Mexer no valor de uma tarefa de bônus não afeta o total das
+  // obrigatórias, então ali o aviso seria falso.
+  const ehObrigatoria = t.categoria === "individual" || t.categoria === "individual_coletiva";
 
   if (!editando) {
     return (
@@ -99,6 +110,7 @@ function ItemEditavel({
           onClick={() => {
             setFinalidade(t.finalidade ?? "Para mim");
             setModoFrequencia(modoDe(t));
+            setJaAvisou(false);
             setEditando(true);
           }}
         >
@@ -120,13 +132,40 @@ function ItemEditavel({
         <input type="hidden" name="taskId" value={t.id} />
         <input name="name" defaultValue={t.name} className="text-sm" placeholder="Nome" required />
         <input
+          ref={campoValorRef}
           name="valor_unitario"
           defaultValue={paraCampo(t.valor_unitario)}
           className="text-sm"
           placeholder="Valor"
           inputMode="decimal"
           required
+          onFocus={() => {
+            if (ehObrigatoria && !jaAvisou) {
+              setJaAvisou(true);
+              setAvisandoValor(true);
+            }
+          }}
         />
+
+        {avisandoValor && (
+          <JanelaAviso
+            titulo="Isso muda o valor base"
+            onFechar={() => {
+              setAvisandoValor(false);
+              campoValorRef.current?.focus();
+            }}
+          >
+            <p className="text-sm text-slate-300">
+              Mudar o valor desta tarefa muda a soma total das tarefas obrigatórias — o valor usado como base do
+              cálculo, que é quanto cada criança pode ganhar por mês fazendo tudo.
+            </p>
+            <p className="text-sm text-slate-300">
+              Se essa soma se afastar do valor base que você registrou, um aviso aparece no card do topo desta
+              aba. Para voltar ao valor de antes, use &ldquo;Mudar valor base&rdquo; — mas atenção: isso recalcula
+              automaticamente o valor de todas as tarefas obrigatórias, inclusive esta.
+            </p>
+          </JanelaAviso>
+        )}
         <input
           name="icone"
           defaultValue={t.icone ?? ""}

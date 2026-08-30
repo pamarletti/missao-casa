@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import JanelaAviso from "@/components/JanelaAviso";
 
 /** Aviso que abre sozinho ao chegar na tela de cadastro.
  *
@@ -14,18 +15,6 @@ import { useEffect, useRef, useState } from "react";
  * dígitos dos responsáveis, esse sim individual. */
 export default function AvisoSenhaSimples() {
   const [aberto, setAberto] = useState(true);
-  const botaoRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!aberto) return;
-    botaoRef.current?.focus();
-
-    function aoTeclar(e: KeyboardEvent) {
-      if (e.key === "Escape") setAberto(false);
-    }
-    document.addEventListener("keydown", aoTeclar);
-    return () => document.removeEventListener("keydown", aoTeclar);
-  }, [aberto]);
 
   if (!aberto) {
     return (
@@ -40,37 +29,16 @@ export default function AvisoSenhaSimples() {
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="titulo-aviso-senha"
-      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/80"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) setAberto(false);
-      }}
-    >
-      <div className="card w-full max-w-sm space-y-3">
-        <h2 id="titulo-aviso-senha" className="text-lg font-bold">
-          Escolha uma senha simples
-        </h2>
-        <p className="text-sm text-slate-300">
-          Esta senha vai ser compartilhada com as outras pessoas da família que vão participar da missão — todo
-          mundo entra com o mesmo e-mail e a mesma senha. Escolha uma que seja fácil de todo mundo lembrar.
-        </p>
-        <p className="text-sm text-slate-300">
-          Ela dá acesso só à conta da família, não ao perfil de ninguém. Depois de entrar, cada pessoa escolhe o
-          próprio perfil — e os responsáveis ainda têm um PIN de 4 dígitos só deles, que é o que protege as
-          decisões sobre as tarefas e o dinheiro.
-        </p>
-        <button
-          ref={botaoRef}
-          type="button"
-          className="btn-primary w-full"
-          onClick={() => setAberto(false)}
-        >
-          Entendi
-        </button>
-      </div>
-    </div>
+    <JanelaAviso titulo="Escolha uma senha simples" onFechar={() => setAberto(false)}>
+      <p className="text-sm text-slate-300">
+        Esta senha vai ser compartilhada com as outras pessoas da família que vão participar da missão — todo
+        mundo entra com o mesmo e-mail e a mesma senha. Escolha uma que seja fácil de todo mundo lembrar.
+      </p>
+      <p className="text-sm text-slate-300">
+        Ela dá acesso só à conta da família, não ao perfil de ninguém. Depois de entrar, cada pessoa escolhe o
+        próprio perfil — e os responsáveis ainda têm um PIN de 4 dígitos só deles, que é o que protege as
+        decisões sobre as tarefas e o dinheiro.
+      </p>
+    </JanelaAviso>
   );
 }

@@ -718,7 +718,14 @@ export async function definirValorBase(formData: FormData) {
   const supabase = createClient();
   const { data: obrigatorias } = await supabase
     .from("task_catalog")
-    .select("id, valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana, finalidade, profile_ids")
+    // `dias_excluidos` PRECISA vir aqui. Sem ela, a conta de quantas vezes
+    // a tarefa acontece por mês some do alvo: o servidor calcula achando
+    // que a tarefa vale todo dia, o catálogo mostra o total certo (com os
+    // dias de folga descontados), e o card acusa uma divergência que a
+    // pessoa não consegue fechar por mais que repita a operação.
+    .select(
+      "id, valor_unitario, frequencia, ocorrencias_por_dia, dias_excluidos, pula_fim_de_semana, finalidade, profile_ids"
+    )
     .eq("family_id", familyId)
     .in("categoria", ["individual", "individual_coletiva"])
     .eq("ativo", true);

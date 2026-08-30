@@ -72,7 +72,7 @@ export default function PendenciasTab({
     return relevantes[relevantes.length - 1];
   }
 
-  function Bloco({ titulo, tarefas }: { titulo: string; tarefas: Tarefa[] }) {
+  function Bloco({ titulo, descricao, tarefas }: { titulo: string; descricao: string; tarefas: Tarefa[] }) {
     const linhas = tarefas
       .map((t) => ({
         tarefa: t,
@@ -84,7 +84,8 @@ export default function PendenciasTab({
 
     return (
       <section className="mb-6">
-        <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+        <h2 className="text-lg font-semibold">{titulo}</h2>
+        <p className="text-sm text-slate-400 mb-3">{descricao}</p>
         {linhas.length === 0 ? (
           <p className="text-sm text-green-400">Tudo marcado por aqui! 🎉</p>
         ) : (
@@ -264,8 +265,16 @@ export default function PendenciasTab({
   return (
     <div>
       <BlocoAtrasadas />
-      <Bloco titulo="Hoje" tarefas={obrigatorias.filter((t) => t.frequencia === "diaria")} />
-      <Bloco titulo="Esta semana" tarefas={obrigatorias.filter((t) => t.frequencia === "semanal")} />
+      <Bloco
+        titulo="Hoje"
+        descricao="Tudo o que é obrigatório para ser feito ainda hoje."
+        tarefas={obrigatorias.filter((t) => t.frequencia === "diaria")}
+      />
+      <Bloco
+        titulo="Esta semana"
+        descricao="Tudo o que é obrigatório para ser feito até o final da semana."
+        tarefas={obrigatorias.filter((t) => t.frequencia === "semanal")}
+      />
     </div>
   );
 }

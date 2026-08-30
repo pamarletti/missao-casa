@@ -269,73 +269,6 @@ export default async function Dashboard({
       .order("data", { ascending: true });
     if (semanaTodosError) console.error("Erro ao buscar eventos da semana:", semanaTodosError.message);
 
-    // Descontos por dia: descontos automáticos (silêncio total) + retiradas
-    // manuais negativas, com o suficiente pra montar o agrupamento por dia.
-    const { data: descontosEventosRaw, error: descEventosError } = await supabase
-      .from("task_events")
-      .select("id, data, valor, profile_id, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
-      .eq("family_id", familyId)
-      .eq("status", "desconto_automatico")
-      .order("data", { ascending: false })
-      .limit(300);
-    if (descEventosError) console.error("Erro ao buscar descontos automáticos:", descEventosError.message);
-
-    const { data: descontosAjustesRaw, error: descAjustesError } = await supabase
-      .from("saldo_ajustes")
-      .select("id, criado_em, valor, motivo, profile_id, profiles!saldo_ajustes_profile_id_fkey(name)")
-      .eq("family_id", familyId)
-      .lt("valor", 0)
-      .order("criado_em", { ascending: false })
-      .limit(300);
-    if (descAjustesError) console.error("Erro ao buscar descontos manuais:", descAjustesError.message);
-
-    const descontosEventos = (descontosEventosRaw ?? []).map((e) => ({
-      id: e.id,
-      data: e.data,
-      valor: Number(e.valor),
-      profileId: e.profile_id,
-      profileName: (e.profiles as unknown as { name: string } | null)?.name ?? "—",
-      descricao: (e.task_catalog as unknown as { name: string } | null)?.name ?? "Tarefa",
-    }));
-
-    const descontosAjustes = (descontosAjustesRaw ?? []).map((a) => ({
-      id: a.id,
-      data: String(a.criado_em).slice(0, 10),
-      valor: Number(a.valor),
-      profileId: a.profile_id,
-      profileName: (a.profiles as unknown as { name: string } | null)?.name ?? "—",
-      descricao: a.motivo ? `Ajuste manual — ${a.motivo}` : "Ajuste manual",
-    }));
-
-    // Revisar tarefas: tudo que já está confirmado ou autorizado (liberada),
-    // com contagem do dia de hoje e lista completa pra corrigir qualquer registro.
-    const { data: revisarEventosRaw, error: revisarError } = await supabase
-      .from("task_events")
-      .select("id, data, status, valor, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
-      .eq("family_id", familyId)
-      .in("status", ["confirmado", "liberada"])
-      .order("data", { ascending: false })
-      .limit(300);
-    if (revisarError) console.error("Erro ao buscar tarefas para revisão:", revisarError.message);
-
-    const { count: revisarCountRaw, error: revisarCountError } = await supabase
-      .from("task_events")
-      .select("id", { count: "exact", head: true })
-      .eq("family_id", familyId)
-      .eq("data", today)
-      .in("status", ["confirmado", "liberada"]);
-    if (revisarCountError) console.error("Erro ao contar tarefas revisáveis:", revisarCountError.message);
-
-    const revisarEventos = (revisarEventosRaw ?? []).map((e) => ({
-      id: e.id,
-      data: e.data,
-      status: e.status,
-      valor: Number(e.valor),
-      profileName: (e.profiles as unknown as { name: string } | null)?.name ?? "—",
-      descricao: (e.task_catalog as unknown as { name: string } | null)?.name ?? "Tarefa",
-    }));
-    const revisarCount = revisarCountRaw ?? 0;
-
     const valorBaseObrigatorias = Number(
       (profile.families as unknown as { valor_base_obrigatorias: number } | null)?.valor_base_obrigatorias ?? 90
     );
@@ -366,10 +299,6 @@ export default async function Dashboard({
           eventosSemanaTodos={eventosSemanaTodos ?? []}
           atrasadas={atrasadas}
           resumoFeitas={resumoFeitasPorPerfil}
-          descontosEventos={descontosEventos}
-          descontosAjustes={descontosAjustes}
-          revisarEventos={revisarEventos}
-          revisarCount={revisarCount}
           valorBaseObrigatorias={valorBaseObrigatorias}
           nivelPorPerfil={nivelPorPerfil}
         />

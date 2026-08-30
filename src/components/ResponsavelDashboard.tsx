@@ -9,8 +9,6 @@ import TabBar from "@/components/TabBar";
 import { type AtividadeItem } from "@/components/Atividades";
 import PendenciasTab, { type Atrasada } from "@/components/PendenciasTab";
 import ResumoFeitasCard, { type ResumoFeitas } from "@/components/ResumoFeitasCard";
-import DescontosPorDiaTab from "@/components/DescontosPorDiaTab";
-import RevisarTarefasTab from "@/components/RevisarTarefasTab";
 import CatalogoEditavelTab from "@/components/CatalogoEditavelTab";
 import HistoricoPorPerfilTab from "@/components/HistoricoPorPerfilTab";
 
@@ -28,21 +26,9 @@ type Tarefa = {
 
 type Crianca = { id: string; name: string; icon?: string | null };
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
-type DescontoItem = {
-  id: string;
-  data: string;
-  valor: number;
-  profileId: string;
-  profileName: string;
-  descricao: string;
-};
-type RevisarItem = { id: string; data: string; status: string; valor: number; profileName: string; descricao: string };
-
 const TABS = [
   { key: "inicio", label: "Início" },
   { key: "pendencias", label: "Pendências" },
-  { key: "descontos", label: "Descontos por dia" },
-  { key: "revisar", label: "Revisar tarefas" },
   { key: "catalogo", label: "Catálogo editável" },
   { key: "historico", label: "Histórico por perfil" },
 ] as const;
@@ -60,10 +46,6 @@ export default function ResponsavelDashboard({
   eventosSemanaTodos,
   atrasadas,
   resumoFeitas,
-  descontosEventos,
-  descontosAjustes,
-  revisarEventos,
-  revisarCount,
   valorBaseObrigatorias,
   nivelPorPerfil,
 }: {
@@ -77,10 +59,6 @@ export default function ResponsavelDashboard({
   eventosSemanaTodos: EventoSemana[];
   atrasadas: Atrasada[];
   resumoFeitas: Record<string, ResumoFeitas>;
-  descontosEventos: DescontoItem[];
-  descontosAjustes: DescontoItem[];
-  revisarEventos: RevisarItem[];
-  revisarCount: number;
   valorBaseObrigatorias: number;
   nivelPorPerfil: Record<string, NivelInfo>;
 }) {
@@ -92,6 +70,7 @@ export default function ResponsavelDashboard({
 
       {tab === "inicio" && (
         <>
+          <p className="text-sm text-slate-400 mb-4">Tenha uma visão geral do que está acontecendo.</p>
           {criancas.map((c) => (
             <SaldoCard
               key={c.id}
@@ -124,9 +103,7 @@ export default function ResponsavelDashboard({
         />
       )}
 
-      {tab === "descontos" && <DescontosPorDiaTab eventos={descontosEventos} ajustes={descontosAjustes} />}
 
-      {tab === "revisar" && <RevisarTarefasTab eventos={revisarEventos} count={revisarCount} />}
 
       {tab === "catalogo" && (
         <CatalogoEditavelTab catalog={catalog} familyId={familyId} valorBaseAtual={valorBaseObrigatorias} />

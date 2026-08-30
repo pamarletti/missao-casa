@@ -77,6 +77,12 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
+/** Frase curta no topo de cada aba, explicando pro menino o que ele está
+ * vendo ali. A aba Início não tem — os próprios cards já se explicam. */
+function TextoDaAba({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-slate-400 mb-4">{children}</p>;
+}
+
 export default function CriancaDashboard({
   nome,
   familyId,
@@ -516,27 +522,42 @@ export default function CriancaDashboard({
       )}
 
       {tab === "hoje" && (
-        <Catalogo
-          tarefas={catalog.filter(
-            (t) => t.categoria !== "coletiva" && t.frequencia === "diaria" && !(t.pula_fim_de_semana && ehSextaOuSabado)
-          )}
-          agruparPor="categoria"
-        />
+        <>
+          <TextoDaAba>Essas são suas tarefas obrigatórias para fazer ainda hoje.</TextoDaAba>
+          <Catalogo
+            tarefas={catalog.filter(
+              (t) =>
+                t.categoria !== "coletiva" &&
+                t.frequencia === "diaria" &&
+                !(t.pula_fim_de_semana && ehSextaOuSabado)
+            )}
+            agruparPor="categoria"
+          />
+        </>
       )}
 
       {tab === "semana" && (
-        <Catalogo
-          tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "semanal")}
-          agruparPor="categoria"
-        />
+        <>
+          <TextoDaAba>Essas são suas tarefas obrigatórias para fazer até o fim da semana.</TextoDaAba>
+          <Catalogo
+            tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "semanal")}
+            agruparPor="categoria"
+          />
+        </>
       )}
 
       {tab === "coletivas" && (
-        <Catalogo tarefas={catalog.filter((t) => t.categoria === "coletiva")} agruparPor="subcategoria" />
+        <>
+          <TextoDaAba>
+            Essas são tarefas que você pode fazer pela família e que vão garantir uma grana extra.
+          </TextoDaAba>
+          <Catalogo tarefas={catalog.filter((t) => t.categoria === "coletiva")} agruparPor="subcategoria" />
+        </>
       )}
 
       {tab === "catalogo" && (
         <>
+          <TextoDaAba>Aqui está a lista de todas as tarefas.</TextoDaAba>
           <ControlesCatalogo
             busca={buscaCatalogo}
             setBusca={setBuscaCatalogo}
@@ -552,6 +573,7 @@ export default function CriancaDashboard({
 
       {tab === "atividades" && (
         <>
+          <TextoDaAba>Aqui está a lista de tudo o que já aconteceu nessa missão.</TextoDaAba>
           <TotaisAtividadesCard totais={totaisAtividades} />
           <Atividades itens={atividades} permitirDesfazer={false} />
         </>

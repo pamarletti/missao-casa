@@ -5,9 +5,16 @@ import { useEffect, useId, useRef, useState } from "react";
 /** Olho de mostrar/esconder, desenhado em SVG e não com um caractere: os
  * que existem em texto têm variação de emoji e viram desenho colorido no
  * iPhone (foi o que aconteceu com a seta de refazer). */
-function Olho({ aberto }: { aberto: boolean }) {
+function Olho({ aberto, pequeno }: { aberto: boolean; pequeno?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={pequeno ? "h-3.5 w-3.5" : "h-5 w-5"}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={pequeno ? 2.2 : 1.8}
+    >
       <path
         d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"
         strokeLinecap="round"
@@ -122,7 +129,9 @@ function CampoPin({
   return (
     <div>
       <input type="hidden" name={name} value={valor} />
-      <div className="flex items-center gap-1.5" role="group" aria-label={placeholder}>
+      {/* `relative` para o olho poder ficar por cima da última caixa, em
+          vez de ocupar uma coluna só dele ao lado da fileira. */}
+      <div className="relative inline-flex items-center gap-1.5" role="group" aria-label={placeholder}>
         {digitos.map((d, i) => (
           <input
             key={i}
@@ -150,7 +159,7 @@ function CampoPin({
             onChange={(e) => escrever(i, e.target.value)}
             onKeyDown={(e) => aoTeclar(i, e)}
             onFocus={(e) => e.target.select()}
-            className="w-10 h-10 text-center text-base rounded-lg px-0 py-0"
+            className="w-9 h-9 text-center text-sm rounded-lg px-0 py-0"
           />
         ))}
         <button
@@ -159,9 +168,9 @@ function CampoPin({
           aria-label={visivel ? "Esconder" : "Mostrar"}
           title={visivel ? "Esconder" : "Mostrar"}
           aria-pressed={visivel}
-          className="p-1.5 text-slate-400 hover:text-slate-200 transition"
+          className="absolute right-1 top-1/2 -translate-y-1/2 p-0 text-slate-500 hover:text-slate-200 transition"
         >
-          <Olho aberto={visivel} />
+          <Olho aberto={visivel} pequeno />
         </button>
       </div>
     </div>

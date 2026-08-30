@@ -144,68 +144,104 @@ export default function CriancaDashboard({
   const diaDaSemanaRecife = new Date(agoraRecifeMs).getUTCDay(); // 0 = domingo, 1 = segunda
   const ehSextaOuSabado = diaDaSemanaRecife === 5 || diaDaSemanaRecife === 6;
 
-  function statusAtual(taskId: string, frequencia: string) {
+  /** Todos os registros daquela tarefa na janela atual — hoje, pras
+   * diárias; a semana corrente, pras semanais. */
+  function eventosDaJanela(taskId: string, frequencia: string) {
     const janela = inicioDaJanela(frequencia, today);
-    const relevantes = eventosMes.filter((e) => e.task_id === taskId && e.data >= janela);
-    return relevantes[relevantes.length - 1];
+    return eventosMes.filter((e) => e.task_id === taskId && e.data >= janela);
   }
 
-  /** A tarefa ainda aceita ser marcada nesta janela? Vale para quem nunca
-   * marcou nada e também para quem ficou como "não feito" ou "pedido para
-   * refazer" — enquanto o dia (ou a semana) não virar, ainda dá tempo. */
+  /** Quantas vezes a tarefa ainda pode ser marcada nesta janela.
+   *
+   * Tarefas que acontecem várias vezes por dia (lavar a louça e pôr a mesa
+   * são 3× ao dia, lavar panelas 2×) voltam pra lista depois de cada
+   * marcação, até completarem as vezes do dia — é o `ocorrencias_por_dia`
+   * do catálogo, o mesmo número que já era usado pra calcular quanto a
+   * tarefa rende por mês.
+   *
+   * "Não feito" e "pedido para refazer" não ocupam vaga: enquanto a janela
+   * não virar, ainda dá tempo de fazer. */
+  function vagasRestantes(t: Tarefa) {
+    const total = t.frequencia === "diaria" ? t.ocorrencias_por_dia || 1 : 1;
+    const ocupadas = eventosDaJanela(t.id, t.frequencia).filter(
+      (e) => !["nao_feito", "pedido_para_refazer"].includes(e.status)
+    ).length;
+    return { total, ocupadas, vagas: Math.max(0, total - ocupadas) };
+  }
+
+  /** A tarefa ainda aceita ser marcada nesta janela? */
   function aindaDaTempo(t: Tarefa) {
-    const evento = statusAtual(t.id, t.frequencia);
-    return !evento || evento.status === "nao_feito" || evento.status === "pedido_para_refazer";
+    return vagasRestantes(t).vagas > 0;
   }
 
   function TarefaRow({ t }: { t: Tarefa }) {
-    const evento = statusAtual(t.id, t.frequencia);
-    // "Não feito" e "pedido para refazer" não trancam a tarefa: enquanto o
-    // dia (ou a semana) não virar, ainda dá tempo — o botão volta e ela
-    // pode ser marcada de novo, como se nada tivesse acontecido.
-    const podeTentarDeNovo =
-      evento?.status === "nao_feito" || evento?.status === "pedido_para_refazer";
-    const livre = !evento || podeTentarDeNovo;
+    const eventos = eventosDaJanela(t.id, t.frequencia);
+    const { total, ocupadas, vagas } = vagasRestantes(t);
+
+    // Coletiva já autorizada, esperando o "Feito" do menino.
+    const liberada = eventos.find((e) => e.status === "liberada");
+    // Marcação dele que ainda está na mão do responsável (dá pra cancelar).
+    const esperando = eventos.find((e) =>
+      ["aguardando_confirmacao", "aguardando_autorizacao"].includes(e.status)
+    );
+    const naoFeito = eventos.some((e) => e.status === "nao_feito");
+    const pedidoRefazer = eventos.some((e) => e.status === "pedido_para_refazer");
+    const confirmadas = eventos.filter((e) => e.status === "confirmado").length;
+
     return (
       <li className="card p-3 flex flex-col items-center text-center gap-1 h-full">
         <span className="text-3xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
-        <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
+        <p className="text-xs text-slate-400">
+          R$ {Number(t.valor_unitario).toFixed(2)}
+          {total > 1 && <span className="text-slate-500"> · {total}× por dia</span>}
+        </p>
+
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
-          {podeTentarDeNovo && (
-            <span className="text-xs text-amber-400">
-              {evento?.status === "nao_feito" ? "não feito — ainda dá tempo!" : "pedido para refazer"}
+          {total > 1 && (
+            <span className="text-xs text-slate-400">
+              {ocupadas} de {total} hoje
             </span>
           )}
-          {livre && t.categoria !== "coletiva" && (
-            <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
+
+          {naoFeito && <span className="text-xs text-amber-400">não feito — ainda dá tempo!</span>}
+          {pedidoRefazer && <span className="text-xs text-amber-400">pedido para refazer</span>}
+
+          {liberada && (
+            <form action={markColetivaDone.bind(null, liberada.id)} className="w-full">
               <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
             </form>
           )}
-          {livre && t.categoria === "coletiva" && (
+
+          {!liberada && vagas > 0 && (
             <form action={markOrRequest.bind(null, t.id, familyId)} className="w-full">
-              <BotaoAcao className="btn-secondary text-xs w-full">Quero fazer</BotaoAcao>
+              <BotaoAcao
+                className={(t.categoria === "coletiva" ? "btn-secondary" : "btn-primary") + " text-xs w-full"}
+              >
+                {t.categoria === "coletiva" ? "Quero fazer" : "Feito"}
+              </BotaoAcao>
             </form>
           )}
-          {evento?.status === "liberada" && (
-            <form action={markColetivaDone.bind(null, evento.id)} className="w-full">
-              <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
-            </form>
-          )}
-          {evento && ["aguardando_confirmacao", "aguardando_autorizacao"].includes(evento.status) && (
+
+          {esperando && (
             <>
               <span className="text-xs text-amber-400">
-                {evento.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
+                {esperando.status === "aguardando_autorizacao" ? "esperando liberação" : "aguardando confirmação"}
               </span>
               <BotaoDireto
                 className="text-xs text-slate-500 underline disabled:opacity-40"
-                acao={() => cancelarPropriaMarcacao(evento.id)}
+                acao={() => cancelarPropriaMarcacao(esperando.id)}
               >
                 cancelar
               </BotaoDireto>
             </>
           )}
-          {evento?.status === "confirmado" && <span className="text-xs text-green-400">confirmado ✓</span>}
+
+          {vagas === 0 && !esperando && !liberada && confirmadas > 0 && (
+            <span className="text-xs text-green-400">
+              {total > 1 ? "tudo feito hoje ✓" : "confirmado ✓"}
+            </span>
+          )}
         </div>
       </li>
     );
@@ -360,10 +396,9 @@ export default function CriancaDashboard({
   // Só entram tarefas com alguma ação disponível nesse momento — sem
   // nenhuma marcação ainda, ou coletivas já liberadas esperando só o
   // "Feito" — nunca as que já foram feitas ou já estão decididas.
-  const coletivasSugeridas = coletivas.filter((t) => {
-    const evento = statusAtual(t.id, t.frequencia);
-    return aindaDaTempo(t) || evento?.status === "liberada";
-  });
+  const coletivasSugeridas = coletivas.filter(
+    (t) => aindaDaTempo(t) || eventosDaJanela(t.id, t.frequencia).some((e) => e.status === "liberada")
+  );
   const sugestoesTempinho = [...diariasEmRisco, ...semanaisEmRisco, ...coletivasSugeridas].slice(0, 4);
 
   return (

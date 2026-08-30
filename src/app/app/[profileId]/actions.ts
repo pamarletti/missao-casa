@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveProfile, clearActiveProfile } from "@/lib/activeProfile";
-import { valorMensalTotal } from "@/lib/valorBase";
+import { valorMensalTotal, escalarParaTotalMensal } from "@/lib/valorBase";
 import { inicioDaJanela, hojeEmRecife } from "@/lib/periodos";
 
 async function requireActiveProfile() {
@@ -78,19 +78,62 @@ async function eventoParaRefazer(
   return data?.id ?? null;
 }
 
+/** Quantas vezes a tarefa ainda pode ser marcada nesta janela.
+ *
+ * Tarefas que acontecem mais de uma vez por dia (lavar a louça 3×, lavar
+ * panelas 2×...) voltam pra lista depois de cada marcação, até completar
+ * as vezes do dia. Registros de "não feito" e "pedido para refazer" não
+ * ocupam vaga — ainda dá tempo de fazer enquanto a janela não virar.
+ *
+ * Existe pra o servidor não aceitar mais marcações do que o combinado,
+ * mesmo que a tela mande (dois toques rápidos, duas abas abertas). */
+async function vagasRestantes(
+  supabase: ReturnType<typeof createClient>,
+  taskId: string,
+  profileId: string,
+  frequencia: string,
+  ocorrenciasPorDia: number | null
+) {
+  const total = frequencia === "diaria" ? ocorrenciasPorDia || 1 : 1;
+  const janela = inicioDaJanela(frequencia, hojeEmRecife());
+
+  const { count } = await supabase
+    .from("task_events")
+    .select("id", { count: "exact", head: true })
+    .eq("task_id", taskId)
+    .eq("profile_id", profileId)
+    .gte("data", janela)
+    .not("status", "in", "(nao_feito,pedido_para_refazer)");
+
+  return Math.max(0, total - (count ?? 0));
+}
+
 export async function markOrRequest(taskId: string, familyId: string) {
   const active = await requireActiveProfile();
   const supabase = createClient();
 
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("categoria, valor_unitario, frequencia")
+    .select("categoria, valor_unitario, frequencia, ocorrencias_por_dia")
     .eq("id", taskId)
     .single();
   if (!task) return;
 
   const status = task.categoria === "coletiva" ? "aguardando_autorizacao" : "aguardando_confirmacao";
   const idParaRefazer = await eventoParaRefazer(supabase, taskId, active.profileId, task.frequencia);
+
+  // Reaproveitar um "não feito" não consome vaga nova; fora isso, respeita
+  // o limite de vezes por dia da tarefa.
+  if (!idParaRefazer) {
+    const vagas = await vagasRestantes(
+      supabase,
+      taskId,
+      active.profileId,
+      task.frequencia,
+      task.ocorrencias_por_dia
+    );
+    if (vagas <= 0) return;
+  }
 
   if (idParaRefazer) {
     await supabase
@@ -218,7 +261,7 @@ export async function registrarDireto(
   const supabase = createClient();
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("valor_unitario, frequencia")
+    .select("valor_unitario, frequencia, ocorrencias_por_dia")
     .eq("id", taskId)
     .single();
   if (!task) return;
@@ -240,6 +283,11 @@ export async function registrarDireto(
     if (idParaRefazer) {
       await supabase.from("task_events").update(dadosFeito).eq("id", idParaRefazer);
     } else {
+      const vagas = await vagasRestantes(supabase, taskId, profileId, task.frequencia, task.ocorrencias_por_dia);
+      if (vagas <= 0) {
+        revalidatePath(`/app/${active.profileId}`);
+        return;
+      }
       await supabase.from("task_events").insert({
         family_id: familyId,
         task_id: taskId,
@@ -455,19 +503,31 @@ export async function definirValorBase(formData: FormData) {
     return;
   }
 
-  const totalAtual = valorMensalTotal(obrigatorias);
-  if (totalAtual <= 0) {
+  // Escala mantendo os valores em centavos redondos E fazendo a soma bater
+  // exata com o alvo — ver escalarParaTotalMensal para o porquê de não ser
+  // só multiplicar cada valor pelo fator e arredondar.
+  const escalonadas = escalarParaTotalMensal(obrigatorias, novoValor);
+  if (escalonadas.length === 0) {
     revalidatePath(`/app/${active.profileId}`);
     return;
   }
 
-  const fator = novoValor / totalAtual;
-  for (const t of obrigatorias) {
-    const novoValorUnitario = Math.round(Number(t.valor_unitario) * fator * 100) / 100;
-    await supabase.from("task_catalog").update({ valor_unitario: novoValorUnitario }).eq("id", t.id);
+  for (const { tarefa, valorUnitario } of escalonadas) {
+    if (Number(tarefa.valor_unitario) === valorUnitario) continue;
+    await supabase.from("task_catalog").update({ valor_unitario: valorUnitario }).eq("id", tarefa.id);
   }
 
-  await supabase.from("families").update({ valor_base_obrigatorias: novoValor }).eq("id", familyId);
+  // Grava o total realmente alcançado, não o que foi digitado: nos catálogos
+  // normais os dois são idênticos, e quando não dá para fechar exato (alvo de
+  // centavo ímpar) isso evita que o card fique acusando divergência para
+  // sempre.
+  const totalAlcancado = valorMensalTotal(
+    escalonadas.map(({ tarefa, valorUnitario }) => ({ ...tarefa, valor_unitario: valorUnitario })),
+  );
+  await supabase
+    .from("families")
+    .update({ valor_base_obrigatorias: Math.round(totalAlcancado * 100) / 100 })
+    .eq("id", familyId);
 
   revalidatePath(`/app/${active.profileId}`);
 }

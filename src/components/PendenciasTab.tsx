@@ -10,6 +10,7 @@ type Tarefa = {
   name: string;
   categoria: "individual" | "individual_coletiva" | "coletiva";
   frequencia: string;
+  ocorrencias_por_dia: number;
   valor_unitario: number;
   icone: string | null;
 };
@@ -71,28 +72,39 @@ export default function PendenciasTab({
 }) {
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
 
-  function statusDoFilho(taskId: string, frequencia: string, profileId: string) {
-    const janela = inicioDaJanela(frequencia, hojeISO);
-    const relevantes = eventos.filter(
-      (e) => e.task_id === taskId && e.profile_id === profileId && e.data >= janela
+  /** Situação de uma tarefa para uma criança, nesta janela.
+   *
+   * Tarefas que acontecem mais de uma vez por dia (lavar a louça 3×, lavar
+   * panelas 2×...) continuam na lista até completar as vezes do dia — por
+   * isso conta vagas, e não só "tem ou não tem registro". */
+  function situacaoDoFilho(t: Tarefa, profileId: string) {
+    const janela = inicioDaJanela(t.frequencia, hojeISO);
+    const doFilho = eventos.filter(
+      (e) => e.task_id === t.id && e.profile_id === profileId && e.data >= janela
     );
-    return relevantes[relevantes.length - 1];
+
+    const total = t.frequencia === "diaria" ? t.ocorrencias_por_dia || 1 : 1;
+    const ocupadas = doFilho.filter((e) => !AINDA_DA_TEMPO.includes(e.status)).length;
+
+    return {
+      total,
+      ocupadas,
+      vagas: Math.max(0, total - ocupadas),
+      /** Marcação do menino esperando a decisão do responsável. */
+      esperando: doFilho.find((e) => ESPERANDO_DECISAO.includes(e.status)),
+      /** Já foi marcada como não feita / pra refazer nesta janela. */
+      naoFeito: doFilho.some((e) => AINDA_DA_TEMPO.includes(e.status)),
+      ultimo: doFilho[doFilho.length - 1],
+    };
   }
 
   function Bloco({ titulo, descricao, tarefas }: { titulo: string; descricao: string; tarefas: Tarefa[] }) {
     const linhas = tarefas
       .map((t) => ({
         tarefa: t,
-        porFilho: criancas.map((c) => ({ crianca: c, evento: statusDoFilho(t.id, t.frequencia, c.id) })),
+        porFilho: criancas.map((c) => ({ crianca: c, situacao: situacaoDoFilho(t, c.id) })),
       }))
-      .filter((linha) =>
-        linha.porFilho.some(
-          (pf) =>
-            !pf.evento ||
-            ESPERANDO_DECISAO.includes(pf.evento.status) ||
-            AINDA_DA_TEMPO.includes(pf.evento.status)
-        )
-      );
+      .filter((linha) => linha.porFilho.some((pf) => pf.situacao.vagas > 0 || pf.situacao.esperando));
 
     return (
       <section className="mb-6">
@@ -112,73 +124,79 @@ export default function PendenciasTab({
                   </span>
                 </div>
                 <ul className="divide-y divide-slate-700/60">
-                  {porFilho.map(({ crianca, evento }) => (
-                    <li key={crianca.id} className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
-                      <span className="text-sm">{crianca.name}</span>
-                      {!evento || AINDA_DA_TEMPO.includes(evento.status) ? (
-                        <div className="flex items-center gap-1.5">
-                          {evento && (
-                            <span className="text-xs text-amber-400 mr-1">
-                              {evento.status === "nao_feito" ? "não feito" : "refazer"}
+                  {porFilho.map(({ crianca, situacao }) => {
+                    const { total, ocupadas, vagas, esperando, naoFeito, ultimo } = situacao;
+                    return (
+                      <li
+                        key={crianca.id}
+                        className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
+                      >
+                        <span className="text-sm">
+                          {crianca.name}
+                          {total > 1 && (
+                            <span className="text-xs text-slate-500 ml-1">
+                              ({ocupadas} de {total})
                             </span>
                           )}
-                          <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "feito")}>
-                            <BotaoAcao className="btn-primary text-xs px-2 py-0.5" title="Marcar feito">
+                        </span>
+
+                        {esperando ? (
+                          <div className="flex gap-1.5">
+                            <BotaoDireto
+                              className="btn-primary text-xs px-2 py-0.5"
+                              title={
+                                esperando.status === "aguardando_autorizacao"
+                                  ? "Autorizar que ele faça"
+                                  : "Confirmar que foi feita"
+                              }
+                              acao={() =>
+                                decidir(
+                                  esperando.id,
+                                  esperando.status === "aguardando_autorizacao" ? "autorizar" : "confirmar"
+                                )
+                              }
+                            >
                               ✓
-                            </BotaoAcao>
-                          </form>
-                          <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "nao_feito")}>
-                            <BotaoAcao className="btn-danger text-xs px-2 py-0.5" title="Marcar não feito">
+                            </BotaoDireto>
+                            <BotaoDireto
+                              className="btn-danger text-xs px-2 py-0.5"
+                              title="Marcar não feito"
+                              acao={() => decidir(esperando.id, "nao_feito")}
+                            >
                               ✗
-                            </BotaoAcao>
-                          </form>
-                        </div>
-                      ) : evento.status === "aguardando_confirmacao" ? (
-                        <div className="flex gap-1.5">
-                          <BotaoDireto
-                            className="btn-primary text-xs px-2 py-0.5"
-                            title="Confirmar que foi feita"
-                            acao={() => decidir(evento.id, "confirmar")}
-                          >
-                            ✓
-                          </BotaoDireto>
-                          <BotaoDireto
-                            className="btn-danger text-xs px-2 py-0.5"
-                            title="Marcar não feito"
-                            acao={() => decidir(evento.id, "nao_feito")}
-                          >
-                            ✗
-                          </BotaoDireto>
-                          <BotaoDireto
-                            className="btn bg-gray-600 text-slate-100 hover:bg-gray-500 text-xs px-2 py-0.5"
-                            title="Pedir para refazer"
-                            acao={() => decidir(evento.id, "refazer")}
-                          >
-                            ↺
-                          </BotaoDireto>
-                        </div>
-                      ) : evento.status === "aguardando_autorizacao" ? (
-                        <div className="flex gap-1.5">
-                          <BotaoDireto
-                            className="btn-primary text-xs px-2 py-0.5"
-                            title="Autorizar que ele faça"
-                            acao={() => decidir(evento.id, "autorizar")}
-                          >
-                            ✓
-                          </BotaoDireto>
-                          <BotaoDireto
-                            className="btn-danger text-xs px-2 py-0.5"
-                            title="Marcar não feito"
-                            acao={() => decidir(evento.id, "nao_feito")}
-                          >
-                            ✗
-                          </BotaoDireto>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">{STATUS_LABEL[evento.status] ?? evento.status}</span>
-                      )}
-                    </li>
-                  ))}
+                            </BotaoDireto>
+                            {esperando.status === "aguardando_confirmacao" && (
+                              <BotaoDireto
+                                className="btn bg-gray-600 text-slate-100 hover:bg-gray-500 text-xs px-2 py-0.5"
+                                title="Pedir para refazer"
+                                acao={() => decidir(esperando.id, "refazer")}
+                              >
+                                ↺
+                              </BotaoDireto>
+                            )}
+                          </div>
+                        ) : vagas > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            {naoFeito && <span className="text-xs text-amber-400 mr-1">não feito</span>}
+                            <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "feito")}>
+                              <BotaoAcao className="btn-primary text-xs px-2 py-0.5" title="Marcar feito">
+                                ✓
+                              </BotaoAcao>
+                            </form>
+                            <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "nao_feito")}>
+                              <BotaoAcao className="btn-danger text-xs px-2 py-0.5" title="Marcar não feito">
+                                ✗
+                              </BotaoAcao>
+                            </form>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            {total > 1 ? "tudo feito ✓" : STATUS_LABEL[ultimo?.status ?? ""] ?? ultimo?.status}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </li>
             ))}

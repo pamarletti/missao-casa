@@ -454,6 +454,13 @@ export async function marcarDesnecessaria(taskId: string, desnecessaria: boolean
   revalidatePath(`/app/${active.profileId}`);
 }
 
+/** Valores aceitos nas classificações — o servidor não grava nada fora
+ * desta lista, mesmo que o navegador mande. "Facultativa" é o valor no
+ * banco; na tela ele aparece como "Bônus". */
+const TIPOS = ["Obrigatória", "Facultativa"];
+const FINALIDADES = ["Para mim", "Compartilhadas", "Para a família"];
+const FREQUENCIAS = ["diaria", "semanal", "mensal"];
+
 export async function editarTarefa(formData: FormData) {
   const active = await requireActiveProfile();
   if (active.kind !== "responsavel") return;
@@ -469,15 +476,54 @@ export async function editarTarefa(formData: FormData) {
   }
 
   const supabase = createClient();
-  await supabase.from("task_catalog").update({ name, valor_unitario: valorInformado, icone }).eq("id", taskId);
+
+  const patch: Record<string, unknown> = { name, valor_unitario: valorInformado, icone };
+
+  // Reclassificação: cada uma das quatro categorias vem do formulário com
+  // uma opção só. Campos ausentes não são tocados.
+  const tipo = String(formData.get("tipo") || "").trim();
+  const finalidade = String(formData.get("finalidade") || "").trim();
+  const comodo = String(formData.get("comodo") || "").trim();
+  const frequencia = String(formData.get("frequencia") || "").trim();
+
+  if (TIPOS.includes(tipo)) patch.tipo = tipo;
+  if (FINALIDADES.includes(finalidade)) patch.finalidade = finalidade;
+  if (comodo) patch.comodo = comodo;
+  if (FREQUENCIAS.includes(frequencia)) {
+    patch.frequencia = frequencia;
+    // "vezes por dia" só faz sentido em tarefa diária.
+    if (frequencia !== "diaria") patch.ocorrencias_por_dia = 1;
+  }
+
+  // `categoria` é a coluna antiga, que ainda comanda regras do app (quem
+  // precisa de autorização, quem tem cota por dia, como as listas de Hoje e
+  // Esta semana se agrupam). Ela passa a ser derivada das classificações
+  // novas, pra as duas nunca discordarem: bônus vira "coletiva" (pede
+  // autorização, sem cota); obrigatória só sua vira "individual"; obrigatória
+  // compartilhada ou da família vira "individual_coletiva".
+  if (patch.tipo || patch.finalidade) {
+    const { data: antes } = await supabase
+      .from("task_catalog")
+      .select("tipo, finalidade")
+      .eq("id", taskId)
+      .single();
+    const tipoFinal = (patch.tipo as string) ?? antes?.tipo ?? "Obrigatória";
+    const finalFinal = (patch.finalidade as string) ?? antes?.finalidade ?? "Para mim";
+    patch.categoria =
+      tipoFinal === "Facultativa" ? "coletiva" : finalFinal === "Para mim" ? "individual" : "individual_coletiva";
+  }
+
+  await supabase.from("task_catalog").update(patch).eq("id", taskId);
 
   const { data: tarefaEditada } = await supabase
     .from("task_catalog")
-    .select("family_id, categoria")
+    .select("family_id")
     .eq("id", taskId)
     .single();
 
-  if (tarefaEditada && (tarefaEditada.categoria === "individual" || tarefaEditada.categoria === "individual_coletiva")) {
+  // Recalcula sempre: mudar valor, frequência ou o tipo de uma tarefa muda a
+  // soma real das obrigatórias, pra qualquer lado.
+  if (tarefaEditada) {
     const { data: obrigatorias } = await supabase
       .from("task_catalog")
       .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")

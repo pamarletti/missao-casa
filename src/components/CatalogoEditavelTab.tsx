@@ -5,6 +5,7 @@ import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalTotal } from "@/lib/valorBase";
 import ListaAgrupada from "@/components/ListaAgrupada";
+import { tipoDa } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
@@ -25,7 +26,39 @@ type Tarefa = {
   comodo: string | null;
 };
 
-function ItemEditavel({ t }: { t: Tarefa }) {
+/** Um <select> por classificação: uma opção só em cada, como pediu a
+ * Paolla. As opções de Cômodo/Área vêm do próprio catálogo, então a lista
+ * acompanha o que a família já usa. */
+function CampoCategoria({
+  nome,
+  rotulo,
+  valor,
+  opcoes,
+}: {
+  nome: string;
+  rotulo: string;
+  valor: string;
+  opcoes: { value: string; label: string }[];
+}) {
+  return (
+    <label className="text-xs text-slate-400">
+      {rotulo}
+      <select
+        name={nome}
+        defaultValue={valor}
+        className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-xl px-2 py-1.5 text-sm text-slate-100"
+      >
+        {opcoes.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ItemEditavel({ t, comodos }: { t: Tarefa; comodos: string[] }) {
   const [editando, setEditando] = useState(false);
 
   if (!editando) {
@@ -61,6 +94,45 @@ function ItemEditavel({ t }: { t: Tarefa }) {
           placeholder="Ícone (emoji)"
           maxLength={4}
         />
+
+        <div className="border-t border-slate-700/60 pt-2 space-y-2">
+          <CampoCategoria
+            nome="tipo"
+            rotulo="Tipo"
+            valor={tipoDa(t)}
+            opcoes={[
+              { value: "Obrigatória", label: "Obrigatória" },
+              { value: "Facultativa", label: "Bônus" },
+            ]}
+          />
+          <CampoCategoria
+            nome="frequencia"
+            rotulo="Frequência"
+            valor={t.frequencia}
+            opcoes={[
+              { value: "diaria", label: "Diária" },
+              { value: "semanal", label: "Semanal" },
+              { value: "mensal", label: "Mensal" },
+            ]}
+          />
+          <CampoCategoria
+            nome="finalidade"
+            rotulo="Finalidade"
+            valor={t.finalidade ?? "Para mim"}
+            opcoes={[
+              { value: "Para mim", label: "Para mim" },
+              { value: "Compartilhadas", label: "Compartilhadas" },
+              { value: "Para a família", label: "Para a família" },
+            ]}
+          />
+          <CampoCategoria
+            nome="comodo"
+            rotulo="Cômodo/Área"
+            valor={t.comodo ?? comodos[0] ?? ""}
+            opcoes={comodos.map((x) => ({ value: x, label: x }))}
+          />
+        </div>
+
         <div className="flex gap-2">
           <BotaoAcao className="btn-primary text-xs flex-1" carregando="salvando…">
             Salvar
@@ -173,6 +245,12 @@ export default function CatalogoEditavelTab({
   const ativas = catalog.filter((t) => t.ativo);
   const desnecessarias = catalog.filter((t) => !t.ativo);
 
+  // Opções de Cômodo/Área saem do próprio catálogo, então a lista acompanha
+  // o que a família já usa, sem precisar cadastrar nada à parte.
+  const comodos = Array.from(new Set(catalog.map((t) => t.comodo).filter((x): x is string => !!x))).sort((a, b) =>
+    a.localeCompare(b, "pt-BR")
+  );
+
   const { abertas, alternar } = useSecoesExpansiveis();
 
   return (
@@ -183,7 +261,11 @@ export default function CatalogoEditavelTab({
         tarefas={ativas}
         chaveAba="catalogo-editavel"
         renderItem={(t) => (
-          <ItemEditavel key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}`} t={t} />
+          <ItemEditavel
+            key={`${t.id}-${t.name}-${t.valor_unitario}-${t.icone ?? ""}-${t.tipo ?? ""}-${t.comodo ?? ""}`}
+            t={t}
+            comodos={comodos}
+          />
         )}
       />
 

@@ -6,7 +6,7 @@ import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
 import { reais } from "@/lib/moeda";
-import { diaCombinadoLabel } from "@/lib/dimensoes";
+import { diaCombinadoLabel, valeNoDia } from "@/lib/dimensoes";
 
 type Tarefa = {
   id: string;
@@ -21,6 +21,9 @@ type Tarefa = {
   profile_ids: string[] | null;
   /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
   dia_da_semana: number | null;
+  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
+  dias_excluidos: number[] | null;
+  pula_fim_de_semana: boolean | null;
 };
 
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
@@ -116,6 +119,10 @@ export default function PendenciasTab({
   pedidos: PedidoDeTroca[];
 }) {
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
+  // Dia da semana de hoje, pra não cobrar uma diária num dia em que ela não
+  // vale (a mochila na sexta, por exemplo) — a lista do menino já respeitava
+  // isso, mas a de Pendências não.
+  const diaDeHoje = new Date(hojeISO + "T00:00:00Z").getUTCDay();
   // Mesma ordem usada no servidor, pro rodízio bater entre as telas.
   const idsDasCriancas = criancas.map((c) => c.id);
 
@@ -442,7 +449,7 @@ export default function PendenciasTab({
       <Bloco
         titulo="Hoje"
         descricao="Tudo o que é obrigatório para ser feito ainda hoje."
-        tarefas={obrigatorias.filter((t) => t.frequencia === "diaria")}
+        tarefas={obrigatorias.filter((t) => t.frequencia === "diaria" && valeNoDia(t, diaDeHoje))}
       />
       <Bloco
         titulo="Esta semana"

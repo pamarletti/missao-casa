@@ -3,29 +3,41 @@
  * projetar o potencial de ganho das crianças quanto para o "valor base"
  * que o responsável pode ajustar no Catálogo editável.
  *
- * `pula_fim_de_semana` marca tarefas diárias que não valem na sexta e no
- * sábado (ex.: "cuidar da roupa da escola" e "arrumar a mochila" — não tem
- * aula nesses dois dias, então não tem o que fazer nem o que descontar).
- * Isso faz elas ocorrerem 5x/semana (20x/mês) em vez de 7x/semana (30x/mês). */
+ * Uma tarefa diária pode não valer em alguns dias da semana (ex.: "arrumar
+ * a mochila" não vale na sexta nem no sábado — não tem aula no dia
+ * seguinte). Quantos dias sobram é o que decide quanto ela rende: 5 dias por
+ * semana são 5 ocorrências, não 7. Quem sabe os dias é `diasPorSemana`, em
+ * dimensoes.ts — aqui só se multiplica. */
+
+import { diasPorSemana } from "./dimensoes";
 
 export type TarefaValorBase = {
   valor_unitario: number | string;
   frequencia: string;
   ocorrencias_por_dia?: number | null;
+  dias_excluidos?: number[] | null;
   pula_fim_de_semana?: boolean | null;
 };
 
+/** Um mês tem pouco mais de 4 semanas: 30 dias / 7 = 4,2857. Manter esse
+ * fator faz uma tarefa de todos os dias continuar valendo exatamente 30
+ * vezes por mês, como antes — e uma de 5 dias por semana, 21,43 em vez dos
+ * 20 arredondados de antes. */
+const SEMANAS_POR_MES = 30 / 7;
+
 export function ocorrenciasPorMes(t: TarefaValorBase): number {
-  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) * (t.pula_fim_de_semana ? 20 : 30);
+  if (t.frequencia === "diaria") {
+    return (t.ocorrencias_por_dia || 1) * diasPorSemana(t) * SEMANAS_POR_MES;
+  }
   if (t.frequencia === "semanal") return 4;
   if (t.frequencia === "mensal") return 1;
   return 0;
 }
 
 export function ocorrenciasPorSemana(t: TarefaValorBase): number {
-  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) * (t.pula_fim_de_semana ? 5 : 7);
+  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) * diasPorSemana(t);
   if (t.frequencia === "semanal") return 1;
-  return 0; // mensal não entra na projeção semanal
+  return 0; // mensal e "não específica" não entram na projeção semanal
 }
 
 export function valorMensalTotal(tarefas: TarefaValorBase[]): number {

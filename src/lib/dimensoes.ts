@@ -15,6 +15,9 @@ export type TarefaClassificavel = {
   ocorrencias_por_dia?: number | null;
   /** Dia combinado, nas semanais: 0 = domingo ... 6 = sábado. Nulo = qualquer. */
   dia_da_semana?: number | null;
+  /** Dias em que a diária NÃO vale. Nulo/vazio = todos os dias. */
+  dias_excluidos?: number[] | null;
+  pula_fim_de_semana?: boolean | null;
   tipo?: string | null;
   finalidade?: string | null;
   comodo?: string | null;
@@ -48,6 +51,37 @@ export function tipoLabel(t: TarefaClassificavel): string {
 
 export function ehObrigatoria(t: TarefaClassificavel): boolean {
   return tipoDa(t) === "Obrigatória";
+}
+
+/** Os dias em que a tarefa NÃO vale.
+ *
+ * Lê a coluna nova (`dias_excluidos`) e cai na antiga (`pula_fim_de_semana`,
+ * que queria dizer sexta e sábado) para linhas que ainda não passaram pela
+ * migração 016. Fonte única: telas, cálculo de valor e lista de atrasadas
+ * usam esta função, para nunca discordarem sobre em que dias uma tarefa
+ * existe. */
+type TarefaComDias = {
+  frequencia: string;
+  dias_excluidos?: number[] | null;
+  pula_fim_de_semana?: boolean | null;
+};
+
+export function diasExcluidos(t: TarefaComDias): number[] {
+  if (t.dias_excluidos && t.dias_excluidos.length > 0) return t.dias_excluidos;
+  if (t.pula_fim_de_semana) return [5, 6];
+  return [];
+}
+
+/** A tarefa vale neste dia da semana? Só as diárias podem não valer: uma
+ * semanal ou mensal tem a janela inteira para ser feita. */
+export function valeNoDia(t: TarefaComDias, diaDaSemana: number): boolean {
+  if (t.frequencia !== "diaria") return true;
+  return !diasExcluidos(t).includes(diaDaSemana);
+}
+
+/** Quantos dias por semana a tarefa diária realmente acontece. */
+export function diasPorSemana(t: TarefaComDias): number {
+  return Math.max(0, 7 - diasExcluidos(t).length);
 }
 
 /** Nomes na ordem do getDay do JavaScript, que é a mesma da coluna

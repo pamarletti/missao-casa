@@ -5,7 +5,7 @@ import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { valorMensalPorCrianca } from "@/lib/valorBase";
 import ListaAgrupada from "@/components/ListaAgrupada";
-import { tipoDa, DIAS_DA_SEMANA, diaCombinadoLabel } from "@/lib/dimensoes";
+import { tipoDa, DIAS_DA_SEMANA, diaCombinadoLabel, diasExcluidos } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { reais, paraCampo } from "@/lib/moeda";
@@ -19,6 +19,8 @@ type Tarefa = {
   frequencia: string;
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
+  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
+  dias_excluidos: number[] | null;
   valor_unitario: number;
   icone: string | null;
   /** false = "desnecessária": some das listas dos meninos e das Pendências. */
@@ -263,6 +265,31 @@ function ItemEditavel({
             />
           )}
 
+          {(modoFrequencia === "diaria" || modoFrequencia === "diaria_varias") && (
+            <fieldset className="text-xs text-slate-400">
+              <legend>Dias em que esta tarefa não vale</legend>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                {/* Começa na segunda, como a semana do app. */}
+                {[1, 2, 3, 4, 5, 6, 0].map((n) => (
+                  <label key={n} className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      name="dias_excluidos"
+                      value={n}
+                      defaultChecked={diasExcluidos(t).includes(n)}
+                      className="w-auto"
+                    />
+                    {DIAS_DA_SEMANA[n].slice(0, 3)}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1 text-slate-500">
+                Nenhum marcado = todo dia. Marcar um dia tira a tarefa da lista dele — e tira também o desconto,
+                já que não havia o que fazer.
+              </p>
+            </fieldset>
+          )}
+
           {modoFrequencia === "diaria_varias" ? (
             <CampoCategoria
               nome="ocorrencias_por_dia"
@@ -285,28 +312,32 @@ function ItemEditavel({
             ]}
           />
 
-          {finalidade === "Compartilhadas" && (
-            <fieldset className="rounded-xl border border-slate-600 p-2">
-              <legend className="text-xs text-slate-400 px-1">Quem se reveza nesta tarefa</legend>
-              <div className="space-y-1">
-                {criancas.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="profile_ids"
-                      value={c.id}
-                      defaultChecked={!t.profile_ids || t.profile_ids.length === 0 || t.profile_ids.includes(c.id)}
-                      className="w-auto"
-                    />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Quem ficar de fora não vê a tarefa nem é cobrado por ela.
-              </p>
-            </fieldset>
-          )}
+          <fieldset className="rounded-xl border border-slate-600 p-2">
+            <legend className="text-xs text-slate-400 px-1">
+              {finalidade === "Compartilhadas" ? "Quem se reveza nesta tarefa" : "De quem é esta tarefa"}
+            </legend>
+            <div className="space-y-1">
+              {criancas.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="profile_ids"
+                    value={c.id}
+                    defaultChecked={!t.profile_ids || t.profile_ids.length === 0 || t.profile_ids.includes(c.id)}
+                    className="w-auto"
+                  />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Quem ficar de fora não vê a tarefa nem é cobrado por ela.
+              {finalidade === "Compartilhadas"
+                ? " Com duas ou mais marcadas, elas se revezam: hoje é de uma, amanhã da outra."
+                : " Deixe só uma marcada para a tarefa ser dela sozinha."}
+            </p>
+          </fieldset>
+
           <CampoCategoria
             nome="comodo"
             rotulo="Cômodo/Área"

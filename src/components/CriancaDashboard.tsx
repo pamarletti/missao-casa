@@ -17,7 +17,7 @@ import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import ListaAgrupada from "@/components/ListaAgrupada";
 import ListaPorArea from "@/components/ListaPorArea";
-import { ehObrigatoria, diaCombinadoLabel } from "@/lib/dimensoes";
+import { ehObrigatoria, diaCombinadoLabel, valeNoDia, diasExcluidos, DIAS_DA_SEMANA } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import AtualizacaoAoVivo from "@/components/AtualizacaoAoVivo";
@@ -54,6 +54,8 @@ type Tarefa = {
   valor_unitario: number;
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
+  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
+  dias_excluidos: number[] | null;
   icone: string | null;
   tipo: string | null;
   finalidade: string | null;
@@ -258,7 +260,6 @@ export default function CriancaDashboard({
   const agoraRecifeMs = agora.getTime() - OFFSET_RECIFE_MS;
   const hojeRecife = new Date(agoraRecifeMs).toISOString().slice(0, 10);
   const diaDaSemanaRecife = new Date(agoraRecifeMs).getUTCDay(); // 0 = domingo, 1 = segunda
-  const ehSextaOuSabado = diaDaSemanaRecife === 5 || diaDaSemanaRecife === 6;
 
   /** Todos os registros daquela tarefa na janela atual — hoje, pras
    * diárias; a semana corrente, pras semanais. */
@@ -345,6 +346,11 @@ export default function CriancaDashboard({
         </p>
         {diaCombinadoLabel(t) && (
           <p className="text-xs text-sky-400 leading-tight">{diaCombinadoLabel(t)}</p>
+        )}
+        {diasExcluidos(t).length > 0 && (
+          <p className="text-xs text-sky-400 leading-tight">
+            menos {diasExcluidos(t).map((d) => DIAS_DA_SEMANA[d].replace("-feira", "")).join(", ")}
+          </p>
         )}
 
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
@@ -537,7 +543,7 @@ export default function CriancaDashboard({
   // na sexta/sábado (ex.: mochila, roupa da escola) só entram na conta de
   // "hoje" quando hoje é um dia em que elas realmente valem.
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
-  const obrigatoriasHoje = obrigatorias.filter((t) => !(t.pula_fim_de_semana && ehSextaOuSabado));
+  const obrigatoriasHoje = obrigatorias.filter((t) => valeNoDia(t, diaDaSemanaRecife));
   // Nas compartilhadas, cada menino pega só a fração que o rodízio dá a ele.
   const fracao = (t: Tarefa) => 1 / divisorDoRodizio(t, numCriancas);
   const potencialDia = obrigatoriasHoje
@@ -920,9 +926,9 @@ export default function CriancaDashboard({
                 (t.frequencia === "semanal" && t.dia_da_semana === diaDaSemanaRecife);
               if (!ehDoDia) return false;
 
-              // Sexta e sábado não têm aula no dia seguinte: mochila e
-              // roupa da escola não valem nesses dias.
-              return !(t.pula_fim_de_semana && ehSextaOuSabado);
+              // A família pode ter tirado alguns dias desta tarefa (a
+              // mochila não vale na sexta nem no sábado, por exemplo).
+              return valeNoDia(t, diaDaSemanaRecife);
             })}
             aba={`obrigatorias:${periodo}`}
           />

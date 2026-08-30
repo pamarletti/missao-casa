@@ -22,6 +22,8 @@ type Tarefa = {
   valor_unitario: number;
   ocorrencias_por_dia: number;
   pula_fim_de_semana: boolean;
+  /** Dias em que a diária não vale: 0 = domingo ... 6 = sábado. */
+  dias_excluidos: number[] | null;
   icone: string | null;
   ativo: boolean;
   tipo: string | null;

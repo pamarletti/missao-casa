@@ -12,7 +12,7 @@ import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
-import { valeParaCrianca } from "@/lib/dimensoes";
+import { valeParaCrianca, valeNoDia } from "@/lib/dimensoes";
 import { vezesNoPeriodo, type PedidoDeTroca } from "@/lib/trocas";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
@@ -115,7 +115,7 @@ export default async function Dashboard({
     const { data: catalogoFamilia } = await supabase
       .from("task_catalog")
       .select(
-        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, ativo, tipo, finalidade, comodo, profile_ids, dia_da_semana"
+        "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, dias_excluidos, icone, ativo, tipo, finalidade, comodo, profile_ids, dia_da_semana"
       )
       .eq("family_id", familyId)
       .order("categoria");
@@ -308,9 +308,8 @@ export default async function Dashboard({
       const inicioParaEssaCrianca = criacaoISO > inicioJanelaAtrasadas ? criacaoISO : inicioJanelaAtrasadas;
       for (let dia = inicioParaEssaCrianca; dia < today; dia = somaDiasISO(dia, 1)) {
         const diaDaSemana = diaDaSemanaISO(dia);
-        const eraSextaOuSabado = diaDaSemana === 5 || diaDaSemana === 6;
         for (const tarefa of diariasObrigatorias) {
-          if (tarefa.pula_fim_de_semana && eraSextaOuSabado) continue;
+          if (!valeNoDia(tarefa, diaDaSemana)) continue;
           // Quantas vezes era dela NAQUELE dia: numa compartilhada, só se
           // fosse a vez dela; numa troca aceita, de quem pegou a tarefa (e
           // nunca mais de quem passou adiante). Já vem com as vezes por dia.
@@ -448,7 +447,7 @@ export default async function Dashboard({
   const { data: catalog } = await supabase
     .from("task_catalog")
     .select(
-      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, icone, tipo, finalidade, comodo, profile_ids, dia_da_semana"
+      "id, name, categoria, subcategoria, frequencia, valor_unitario, ocorrencias_por_dia, pula_fim_de_semana, dias_excluidos, icone, tipo, finalidade, comodo, profile_ids, dia_da_semana"
     )
     .eq("family_id", familyId)
     .eq("ativo", true)

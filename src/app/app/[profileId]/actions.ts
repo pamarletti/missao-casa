@@ -633,12 +633,25 @@ export async function editarTarefa(formData: FormData) {
       patch.dia_da_semana = null;
     }
 
-    // "vezes por dia" só faz sentido em tarefa diária; nas outras volta a 1.
+    // "vezes por dia" e "dias de folga" só fazem sentido em tarefa diária;
+    // nas outras voltam ao padrão, pra não sobrar regra escondida de uma
+    // classificação anterior.
     if (frequencia !== "diaria") {
       patch.ocorrencias_por_dia = 1;
+      patch.dias_excluidos = null;
     } else {
       const vezes = Math.floor(Number(formData.get("ocorrencias_por_dia") || 1));
       patch.ocorrencias_por_dia = Number.isFinite(vezes) && vezes >= 1 && vezes <= 12 ? vezes : 1;
+
+      const dias = formData
+        .getAll("dias_excluidos")
+        .map((d) => Number(d))
+        .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+      patch.dias_excluidos = dias.length > 0 ? Array.from(new Set(dias)).sort() : null;
+      // A coluna antiga sai de cena: quem manda agora é a lista. Deixá-la
+      // ligada faria a tarefa voltar a pular sexta e sábado sozinha, se um
+      // dia a lista fosse esvaziada.
+      patch.pula_fim_de_semana = false;
     }
   }
 
@@ -652,20 +665,22 @@ export async function editarTarefa(formData: FormData) {
   // finalidades a lista é limpa, pra não sobrar restrição escondida de uma
   // classificação anterior. Marcar todo mundo grava nulo — é o mesmo que
   // "vale pra todas", e assim uma criança nova entra na tarefa sozinha.
+  // De quem é a tarefa. Vale para QUALQUER finalidade, não só para as
+  // compartilhadas: dá pra atribuir uma tarefa a uma criança específica —
+  // ela aparece só no painel dela, e só ela é cobrada por isso. Nas
+  // compartilhadas, escolher duas ou mais é o que faz elas se revezarem.
+  //
+  // Marcar todo mundo grava nulo, que quer dizer "vale para todas": assim
+  // uma criança que entrar na família depois já entra na tarefa sozinha.
   if (finalidade) {
-    if (finalidade === "Compartilhadas") {
-      const escolhidos = formData.getAll("profile_ids").map(String).filter(Boolean);
-      const { data: tarefa } = await supabase.from("task_catalog").select("family_id").eq("id", taskId).single();
-      const { count: totalCriancas } = await supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("family_id", tarefa?.family_id ?? "")
-        .eq("kind", "crianca");
-      patch.profile_ids =
-        escolhidos.length === 0 || escolhidos.length === (totalCriancas ?? 0) ? null : escolhidos;
-    } else {
-      patch.profile_ids = null;
-    }
+    const escolhidos = formData.getAll("profile_ids").map(String).filter(Boolean);
+    const { count: totalCriancas } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("family_id", (await supabase.from("task_catalog").select("family_id").eq("id", taskId).single()).data?.family_id ?? "")
+      .eq("kind", "crianca");
+    patch.profile_ids =
+      escolhidos.length === 0 || escolhidos.length === (totalCriancas ?? 0) ? null : escolhidos;
   }
 
   if (patch.tipo || patch.finalidade) {

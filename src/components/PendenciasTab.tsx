@@ -158,16 +158,14 @@ export default function PendenciasTab({
                         key={crianca.id}
                         className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
                       >
-                        {/* Nome em âmbar quando a bola está com o responsável:
-                            a criança já marcou e está esperando o ✓ dele. É o
+                        {/* Em âmbar quando a bola está com o responsável: a
+                            criança já marcou e está esperando o ✓ dele. É o
                             que separa, de relance, "ainda não fez" de "fez e
-                            está esperando você conferir". */}
-                        <span
-                          className={
-                            "text-sm " + (esperando ? "text-amber-400 font-semibold" : "")
-                          }
-                        >
-                          {crianca.name}
+                            está esperando você conferir" — e aí o nome vira o
+                            sujeito de uma frase que diz o que fazer. */}
+                        <span className={"text-sm min-w-0 " + (esperando ? "text-amber-400" : "")}>
+                          <span className={esperando ? "font-semibold" : ""}>{crianca.name}</span>
+                          {esperando && " já fez. Confirme ou peça que ele refaça."}
                           {total > 1 && (
                             <span className="text-xs text-slate-500 ml-1">
                               ({ocupadas} de {total})
@@ -181,7 +179,7 @@ export default function PendenciasTab({
                         </span>
 
                         {esperando ? (
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-1.5 shrink-0">
                             <BotaoDireto
                               className="btn-primary text-xs px-2 py-0.5"
                               title={
@@ -197,13 +195,6 @@ export default function PendenciasTab({
                               }
                             >
                               ✓
-                            </BotaoDireto>
-                            <BotaoDireto
-                              className="btn-danger text-xs px-2 py-0.5"
-                              title="Marcar não feito"
-                              acao={() => decidir(esperando.id, "nao_feito")}
-                            >
-                              ✗
                             </BotaoDireto>
                             {esperando.status === "aguardando_confirmacao" && (
                               <BotaoDireto

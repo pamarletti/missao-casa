@@ -262,18 +262,33 @@ function ItemDesnecessario({ t }: { t: Tarefa }) {
  * tarefa individualmente (abaixo) também atualiza esse total sozinho. */
 function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string; catalog: Tarefa[]; valorBaseAtual: number }) {
   const [aberto, setAberto] = useState(false);
+  const [explicando, setExplicando] = useState(false);
   const obrigatorias = catalog.filter((t) => t.categoria === "individual" || t.categoria === "individual_coletiva");
   const totalAtual = valorMensalTotal(obrigatorias);
+  const registrado = Number(valorBaseAtual);
+  const diferente = Math.abs(totalAtual - registrado) > 0.005;
 
   return (
     <div className="card mb-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-slate-400 text-sm">Valor aproximado para cálculo das tarefas obrigatórias:</p>
-          <p className="text-2xl font-bold text-casa-accent">R$ {totalAtual.toFixed(2)}</p>
-          {Math.abs(totalAtual - Number(valorBaseAtual)) > 0.01 && (
+          <p className="text-2xl font-bold text-casa-accent flex items-center gap-2">
+            R$ {totalAtual.toFixed(2)}
+            <button
+              type="button"
+              onClick={() => setExplicando((v) => !v)}
+              aria-expanded={explicando}
+              aria-label="Por que esse valor é aproximado?"
+              title="Por que esse valor é aproximado?"
+              className="h-5 w-5 shrink-0 rounded-full border border-slate-500 text-xs font-serif italic text-slate-400 hover:border-slate-300 hover:text-slate-200 transition"
+            >
+              i
+            </button>
+          </p>
+          {diferente && (
             <p className="text-xs text-slate-500 mt-1">
-              (valor base registrado: R$ {Number(valorBaseAtual).toFixed(2)})
+              (valor base registrado: R$ {registrado.toFixed(2)})
             </p>
           )}
         </div>
@@ -281,6 +296,25 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
           {aberto ? "cancelar" : "Mudar valor base"}
         </button>
       </div>
+
+      {explicando && (
+        <div className="mt-3 border-t border-slate-700 pt-3 text-xs text-slate-400 space-y-2">
+          <p>
+            O valor registrado é exatamente o que você pediu. O valor grande, acima, é o que as tarefas
+            obrigatórias realmente somam por mês — e quase sempre os dois ficam a alguns centavos de distância.
+          </p>
+          <p>
+            O motivo é que cada tarefa precisa ter um preço redondo em centavos, para o menino conseguir
+            entender e conferir o que ganhou. Ao dividir o total entre as tarefas, cada uma é arredondada para o
+            centavo mais próximo, e depois multiplicada pelas vezes que acontece no mês. A soma desses valores
+            arredondados raramente cai no número exato pedido: pede-se R$ 90,00 e a conta fecha em R$ 90,01.
+          </p>
+          <p>
+            A diferença é sempre de centavos, e nunca some do bolso de ninguém — o que os meninos recebem é a
+            soma real, o valor grande.
+          </p>
+        </div>
+      )}
 
       {aberto && (
         <form

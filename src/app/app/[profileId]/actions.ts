@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveProfile, clearActiveProfile } from "@/lib/activeProfile";
 import {
-  valorMensalTotal,
   valorMensalPorCrianca,
   divisorDoRodizio,
   escalarParaTotalMensal,
@@ -686,16 +685,19 @@ export async function definirValorBase(formData: FormData) {
     await supabase.from("task_catalog").update({ valor_unitario: valorUnitario }).eq("id", tarefa.id);
   }
 
-  // Grava o total realmente alcançado, não o que foi digitado: nos catálogos
-  // normais os dois são idênticos, e quando não dá para fechar exato (alvo de
-  // centavo ímpar) isso evita que o card fique acusando divergência para
-  // sempre.
-  const totalAlcancado =
-    valorMensalTotal(escalonadas.map(({ tarefa, valorUnitario }) => ({ ...tarefa, valor_unitario: valorUnitario }))) +
-    jaVemDasCompartilhadas;
+  // Grava EXATAMENTE o valor pedido, não o que a soma alcançou.
+  //
+  // Os dois quase nunca são idênticos, e não tem como serem: cada tarefa
+  // precisa ter um valor redondo em centavos, e a soma de valores redondos,
+  // multiplicados pelas vezes que cada tarefa acontece no mês, raramente cai
+  // no número exato que foi pedido — pede-se R$90,00 e a conta fecha em
+  // R$90,01. Guardar aqui o alvo que a pessoa digitou é o que faz o card
+  // conseguir mostrar as duas coisas com honestidade: o que ela pediu e o
+  // que as tarefas realmente somam (ver ValorBaseCard, e o "i" que explica a
+  // diferença).
   await supabase
     .from("families")
-    .update({ valor_base_obrigatorias: Math.round(totalAlcancado * 100) / 100 })
+    .update({ valor_base_obrigatorias: Math.round(novoValor * 100) / 100 })
     .eq("id", familyId);
 
   revalidatePath(`/app/${active.profileId}`);

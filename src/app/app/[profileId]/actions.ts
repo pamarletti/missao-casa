@@ -11,7 +11,12 @@ import {
   divisorDoRodizio,
   escalarParaTotalMensal,
 } from "@/lib/valorBase";
-import { inicioDaJanela, hojeEmRecife } from "@/lib/periodos";
+import { inicioDaJanela, inicioDaSemana, hojeEmRecife } from "@/lib/periodos";
+import {
+  vezesNoPeriodo,
+  vezesNoPeriodoSemRodizio,
+  type PedidoDeTroca,
+} from "@/lib/trocas";
 
 async function requireActiveProfile() {
   const active = await getActiveProfile();
@@ -96,23 +101,63 @@ async function eventoParaRefazer(
  * COLETIVAS não têm cota: quem define o ritmo é o responsável, que autoriza
  * cada pedido. Uma coletiva só fica indisponível enquanto houver um pedido
  * em andamento; assim que é confirmada, volta a aceitar "Quero fazer". */
+type TarefaParaVagas = {
+  id: string;
+  categoria: string;
+  frequencia: string;
+  ocorrencias_por_dia: number | null;
+  finalidade?: string | null;
+  profile_ids?: string[] | null;
+};
+
+/** Os pedidos de troca que valem pra esta tarefa neste período. */
+async function trocasAceitas(
+  supabase: ReturnType<typeof createClient>,
+  familyId: string,
+  taskId: string,
+  periodo: string
+): Promise<PedidoDeTroca[]> {
+  const { data } = await supabase
+    .from("pedidos_de_troca")
+    .select("id, task_id, de_profile_id, para_profile_id, periodo, status")
+    .eq("family_id", familyId)
+    .eq("task_id", taskId)
+    .eq("periodo", periodo)
+    .eq("status", "aceito");
+  return (data ?? []) as PedidoDeTroca[];
+}
+
+/** Ordem das crianças da família — precisa ser a mesma de todas as telas,
+ * senão o rodízio das compartilhadas daria respostas diferentes aqui. */
+async function criancasDaFamilia(supabase: ReturnType<typeof createClient>, familyId: string) {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("family_id", familyId)
+    .eq("kind", "crianca")
+    .order("name");
+  return (data ?? []).map((c) => c.id as string);
+}
+
 async function vagasRestantes(
   supabase: ReturnType<typeof createClient>,
-  taskId: string,
+  task: TarefaParaVagas,
   profileId: string,
-  categoria: string,
-  frequencia: string,
-  ocorrenciasPorDia: number | null
+  familyId: string,
+  /** Falso quando é o responsável lançando direto: ele pode registrar fora
+   * da vez da criança, o menino não. */
+  respeitarRodizio = true
 ) {
-  const janela = inicioDaJanela(frequencia, hojeEmRecife());
+  const hoje = hojeEmRecife();
+  const janela = inicioDaJanela(task.frequencia, hoje);
   const base = supabase
     .from("task_events")
     .select("id", { count: "exact", head: true })
-    .eq("task_id", taskId)
+    .eq("task_id", task.id)
     .eq("profile_id", profileId)
     .gte("data", janela);
 
-  if (categoria === "coletiva") {
+  if (task.categoria === "coletiva") {
     const { count } = await base.in("status", [
       "aguardando_autorizacao",
       "liberada",
@@ -121,7 +166,11 @@ async function vagasRestantes(
     return (count ?? 0) > 0 ? 0 : 1;
   }
 
-  const total = frequencia === "diaria" ? ocorrenciasPorDia || 1 : 1;
+  const pedidos = await trocasAceitas(supabase, familyId, task.id, janela);
+  const total = respeitarRodizio
+    ? vezesNoPeriodo(task, profileId, await criancasDaFamilia(supabase, familyId), hoje, inicioDaSemana, pedidos)
+    : vezesNoPeriodoSemRodizio(task, profileId, hoje, pedidos);
+
   const { count } = await base.not("status", "in", "(nao_feito,pedido_para_refazer)");
   return Math.max(0, total - (count ?? 0));
 }
@@ -132,7 +181,7 @@ export async function markOrRequest(taskId: string, familyId: string) {
 
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("categoria, valor_unitario, frequencia, ocorrencias_por_dia")
+    .select("id, categoria, valor_unitario, frequencia, ocorrencias_por_dia, finalidade, profile_ids")
     .eq("id", taskId)
     .single();
   if (!task) return;
@@ -143,14 +192,7 @@ export async function markOrRequest(taskId: string, familyId: string) {
   // Reaproveitar um "não feito" não consome vaga nova; fora isso, respeita
   // o limite de vezes por dia da tarefa.
   if (!idParaRefazer) {
-    const vagas = await vagasRestantes(
-      supabase,
-      taskId,
-      active.profileId,
-      task.categoria,
-      task.frequencia,
-      task.ocorrencias_por_dia
-    );
+    const vagas = await vagasRestantes(supabase, task, active.profileId, familyId);
     if (vagas <= 0) return;
   }
 
@@ -280,7 +322,7 @@ export async function registrarDireto(
   const supabase = createClient();
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("valor_unitario, categoria, frequencia, ocorrencias_por_dia")
+    .select("id, valor_unitario, categoria, frequencia, ocorrencias_por_dia, finalidade, profile_ids")
     .eq("id", taskId)
     .single();
   if (!task) return;
@@ -302,14 +344,7 @@ export async function registrarDireto(
     if (idParaRefazer) {
       await supabase.from("task_events").update(dadosFeito).eq("id", idParaRefazer);
     } else {
-      const vagas = await vagasRestantes(
-        supabase,
-        taskId,
-        profileId,
-        task.categoria,
-        task.frequencia,
-        task.ocorrencias_por_dia
-      );
+      const vagas = await vagasRestantes(supabase, task, profileId, familyId, false);
       if (vagas <= 0) {
         revalidatePath(`/app/${active.profileId}`);
         return;
@@ -693,6 +728,107 @@ export async function ajustarSaldo(formData: FormData) {
     motivo,
     criado_por: active.profileId,
   });
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** ──────────────────────────────────────────────────────────────
+ * Trocas entre as crianças
+ *
+ * Uma criança pede que a outra faça uma tarefa obrigatória dela. Enquanto o
+ * pedido está "pendente" nada muda: quem pediu continua responsável, e pode
+ * cancelar. Quando a outra aceita, a tarefa passa pra ela NAQUELE período —
+ * some da lista de quem pediu, aparece na de quem aceitou, e o crédito vai
+ * pra quem fizer. Quando o dia (ou a semana) vira, tudo volta ao normal
+ * sozinho. Ver src/lib/trocas.ts pra conta que sustenta isso.
+ * ────────────────────────────────────────────────────────────── */
+
+/** A criança pede que outra faça a tarefa no lugar dela. */
+export async function pedirTroca(taskId: string, paraProfileId: string, familyId: string) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "crianca") return; // é combinado entre eles
+  if (!taskId || !paraProfileId || paraProfileId === active.profileId) return;
+
+  const supabase = createClient();
+  const { data: task } = await supabase
+    .from("task_catalog")
+    .select("id, categoria, frequencia, ocorrencias_por_dia, finalidade, profile_ids, ativo, family_id")
+    .eq("id", taskId)
+    .single();
+  // Só obrigatórias ativas: as de bônus não têm dono nem obrigação — quem
+  // quiser fazer, faz, não há o que passar adiante.
+  if (!task || !task.ativo || task.categoria === "coletiva" || task.family_id !== familyId) return;
+
+  const criancas = await criancasDaFamilia(supabase, familyId);
+  if (!criancas.includes(paraProfileId) || !criancas.includes(active.profileId)) return;
+
+  const hoje = hojeEmRecife();
+  const periodo = inicioDaJanela(task.frequencia, hoje);
+
+  const { data: pedidosRaw } = await supabase
+    .from("pedidos_de_troca")
+    .select("id, task_id, de_profile_id, para_profile_id, periodo, status")
+    .eq("family_id", familyId)
+    .eq("task_id", taskId)
+    .eq("periodo", periodo)
+    .in("status", ["pendente", "aceito"]);
+  const pedidos = (pedidosRaw ?? []) as PedidoDeTroca[];
+
+  // Um pedido em aberto de cada vez, por tarefa e período — senão daria pra
+  // encher a tela do irmão com o mesmo pedido repetido.
+  if (pedidos.some((p) => p.status === "pendente" && p.de_profile_id === active.profileId)) return;
+
+  // E não dá pra passar adiante mais vezes do que ainda faltam pra ela.
+  const vezes = vezesNoPeriodo(task, active.profileId, criancas, hoje, inicioDaSemana, pedidos);
+  const { count: jaResolvidas } = await supabase
+    .from("task_events")
+    .select("id", { count: "exact", head: true })
+    .eq("task_id", taskId)
+    .eq("profile_id", active.profileId)
+    .gte("data", periodo)
+    .not("status", "in", "(nao_feito,pedido_para_refazer)");
+  if (vezes - (jaResolvidas ?? 0) <= 0) return;
+
+  await supabase.from("pedidos_de_troca").insert({
+    family_id: familyId,
+    task_id: taskId,
+    de_profile_id: active.profileId,
+    para_profile_id: paraProfileId,
+    periodo,
+    status: "pendente",
+  });
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** A criança convidada aceita ou recusa. Aceitou, a tarefa é dela. */
+export async function responderTroca(pedidoId: string, resposta: "aceito" | "recusado") {
+  const active = await requireActiveProfile();
+  if (active.kind !== "crianca") return;
+  if (resposta !== "aceito" && resposta !== "recusado") return;
+
+  const supabase = createClient();
+  await supabase
+    .from("pedidos_de_troca")
+    .update({ status: resposta, respondido_em: new Date().toISOString() })
+    .eq("id", pedidoId)
+    .eq("para_profile_id", active.profileId)
+    .eq("status", "pendente");
+
+  revalidatePath(`/app/${active.profileId}`);
+}
+
+/** Quem pediu desiste, antes de o outro responder. */
+export async function cancelarTroca(pedidoId: string) {
+  const active = await requireActiveProfile();
+  const supabase = createClient();
+
+  await supabase
+    .from("pedidos_de_troca")
+    .delete()
+    .eq("id", pedidoId)
+    .eq("de_profile_id", active.profileId)
+    .eq("status", "pendente");
 
   revalidatePath(`/app/${active.profileId}`);
 }

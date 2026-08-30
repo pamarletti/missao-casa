@@ -50,6 +50,13 @@ export default function ConfirmQueue({
         { event: "*", schema: "public", table: "saldo_ajustes", filter: `family_id=eq.${familyId}` },
         () => router.refresh()
       )
+      .on(
+        // Os meninos combinando trocas entre eles: muda quem deve fazer o
+        // quê, então a aba Pendências precisa se refazer junto.
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pedidos_de_troca", filter: `family_id=eq.${familyId}` },
+        () => router.refresh()
+      )
       .subscribe();
 
     function aoVoltarParaTela() {

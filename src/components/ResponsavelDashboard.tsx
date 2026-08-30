@@ -8,6 +8,7 @@ import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
 import TabBar from "@/components/TabBar";
 import { type AtividadeItem } from "@/components/Atividades";
 import PendenciasTab, { type Atrasada } from "@/components/PendenciasTab";
+import { type PedidoDeTroca } from "@/lib/trocas";
 import ResumoFeitasCard, { type ResumoFeitas } from "@/components/ResumoFeitasCard";
 import CatalogoEditavelTab from "@/components/CatalogoEditavelTab";
 import HistoricoPorPerfilTab from "@/components/HistoricoPorPerfilTab";
@@ -55,6 +56,7 @@ export default function ResponsavelDashboard({
   resumoFeitas,
   valorBaseObrigatorias,
   nivelPorPerfil,
+  pedidosDeTroca,
 }: {
   familyId: string;
   criancas: Crianca[];
@@ -71,6 +73,8 @@ export default function ResponsavelDashboard({
   resumoFeitas: Record<string, ResumoFeitas>;
   valorBaseObrigatorias: number;
   nivelPorPerfil: Record<string, NivelInfo>;
+  /** Trocas combinadas entre os meninos — mudam de quem é cada tarefa hoje. */
+  pedidosDeTroca: PedidoDeTroca[];
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
 
@@ -110,6 +114,7 @@ export default function ResponsavelDashboard({
           eventos={eventosSemanaTodos}
           hojeISO={hojeISO}
           atrasadas={atrasadas}
+          pedidos={pedidosDeTroca}
         />
       )}
 

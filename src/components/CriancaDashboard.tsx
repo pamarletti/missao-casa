@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { markOrRequest, markColetivaDone, cancelarPropriaMarcacao } from "@/app/app/[profileId]/actions";
+import {
+  markOrRequest,
+  markColetivaDone,
+  cancelarPropriaMarcacao,
+  pedirTroca,
+  responderTroca,
+  cancelarTroca,
+} from "@/app/app/[profileId]/actions";
 import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { ocorrenciasPorMes, ocorrenciasPorSemana, divisorDoRodizio } from "@/lib/valorBase";
@@ -10,9 +17,11 @@ import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import ListaAgrupada from "@/components/ListaAgrupada";
 import ListaPorArea from "@/components/ListaPorArea";
-import { ehObrigatoria, ehAVezDaCrianca } from "@/lib/dimensoes";
+import { ehObrigatoria } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
+import AtualizacaoAoVivo from "@/components/AtualizacaoAoVivo";
+import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
 // rotina de desconto automático em src/app/api/cron/desconto/route.ts).
@@ -90,6 +99,64 @@ function TextoDaAba({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-slate-400 mb-4">{children}</p>;
 }
 
+/** O link "pedir pra alguém" que aparece embaixo de cada tarefa
+ * obrigatória. Com um irmão só (o caso da casa hoje) é um clique direto,
+ * com o nome dele escrito; com mais de um, abre a listinha pra escolher.
+ *
+ * Fica no nível do módulo de propósito: componente declarado dentro de
+ * outro componente é recriado a cada render, e o "aberto" se perderia
+ * sozinho no meio do caminho. */
+function PedirTroca({
+  tarefa,
+  familyId,
+  outras,
+}: {
+  tarefa: { id: string };
+  familyId: string;
+  outras: { id: string; name: string }[];
+}) {
+  const [aberto, setAberto] = useState(false);
+
+  if (outras.length === 0) return null;
+
+  if (outras.length === 1) {
+    return (
+      <BotaoDireto
+        className="text-xs text-slate-500 underline disabled:opacity-40"
+        acao={() => pedirTroca(tarefa.id, outras[0].id, familyId)}
+        title={`Pedir que ${outras[0].name} faça essa no seu lugar`}
+      >
+        pedir pra {outras[0].name}
+      </BotaoDireto>
+    );
+  }
+
+  if (!aberto) {
+    return (
+      <button type="button" className="text-xs text-slate-500 underline" onClick={() => setAberto(true)}>
+        pedir pra alguém
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1 w-full">
+      {outras.map((o) => (
+        <BotaoDireto
+          key={o.id}
+          className="btn-secondary text-xs w-full"
+          acao={() => pedirTroca(tarefa.id, o.id, familyId)}
+        >
+          {o.name}
+        </BotaoDireto>
+      ))}
+      <button type="button" className="text-xs text-slate-500 underline" onClick={() => setAberto(false)}>
+        deixa pra lá
+      </button>
+    </div>
+  );
+}
+
 export default function CriancaDashboard({
   nome,
   profileId,
@@ -107,6 +174,8 @@ export default function CriancaDashboard({
   totaisAtividades,
   numCriancas,
   idsDasCriancas,
+  irmaos,
+  pedidos,
 }: {
   nome: string;
   profileId: string;
@@ -125,13 +194,42 @@ export default function CriancaDashboard({
   numCriancas: number;
   /** Ordem das crianças da família, pro rodízio das compartilhadas. */
   idsDasCriancas: string[];
+  /** Todas as crianças da família, com nome — pras trocas entre irmãos. */
+  irmaos: { id: string; name: string }[];
+  /** Pedidos de troca em aberto ou aceitos, de todas as crianças. */
+  pedidos: PedidoDeTroca[];
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
 
-  /** Nas tarefas compartilhadas, os meninos se revezam: hoje é de um,
-   * amanhã do outro. Vale só para as listas do que dá pra fazer agora — as
-   * projeções contam o mês todo, com a fração que cabe a cada um. */
-  const ehMinhaVez = (t: Tarefa) => ehAVezDaCrianca(t, profileId, idsDasCriancas, today, inicioDaSemana);
+  // Só os pedidos do período corrente de cada tarefa: a consulta traz uma
+  // janela larga (pra pegar semanais e mensais de uma vez), então o que
+  // sobrou de dias que já viraram é descartado aqui.
+  const pedidosAtuais = pedidosVigentes(pedidos, catalog, today);
+  const outrasCriancas = irmaos.filter((i) => i.id !== profileId);
+  const nomeDe = (id: string) => irmaos.find((i) => i.id === id)?.name ?? "seu irmão";
+
+  /** Quantas vezes ESTA tarefa é minha hoje (ou nesta semana).
+   *
+   * Junta as duas regras que decidem de quem é a tarefa: o rodízio das
+   * compartilhadas (hoje é de um, amanhã do outro) e as trocas combinadas
+   * entre os meninos (passei a minha pro meu irmão, ou peguei a dele). Zero
+   * quer dizer "não é comigo agora" — a tarefa nem aparece nas listas de
+   * Hoje e Esta semana. Ver src/lib/trocas.ts. */
+  const minhasVezes = (t: Tarefa) =>
+    vezesNoPeriodo(t, profileId, idsDasCriancas, today, inicioDaSemana, pedidosAtuais);
+  const ehMinhaVez = (t: Tarefa) => minhasVezes(t) > 0;
+
+  /** Os pedidos de troca desta tarefa, no período dela. */
+  const pedidosDaTarefa = (t: Tarefa) => pedidosAtuais.filter((p) => p.task_id === t.id);
+
+  /** Passei esta tarefa adiante e o meu irmão aceitou. Ela continua
+   * aparecendo nas minhas listas de Hoje / Esta semana, só que sem botão e
+   * com o nome de quem ficou com ela — se sumisse de vez, eu não teria como
+   * lembrar o que foi combinado. */
+  const passeiAdiante = (t: Tarefa) =>
+    pedidosAtuais.some(
+      (p) => p.task_id === t.id && p.status === "aceito" && p.de_profile_id === profileId
+    );
   const { abertas: secoesAbertas, alternar: alternarSecao } = useSecoesExpansiveis();
 
   // Relógio ao vivo (atualiza a cada 30s) pra contagem regressiva do fim do
@@ -184,7 +282,10 @@ export default function CriancaDashboard({
       return { total: 1, ocupadas: emAndamento, vagas: emAndamento > 0 ? 0 : 1 };
     }
 
-    const total = t.frequencia === "diaria" ? t.ocorrencias_por_dia || 1 : 1;
+    // Quantas vezes ela é MINHA neste período — já com o rodízio e as
+    // trocas aplicados. Se passei a tarefa adiante, dá zero; se peguei a do
+    // meu irmão, ganho uma vez a mais.
+    const total = minhasVezes(t);
     const ocupadas = eventos.filter(
       (e) => !["nao_feito", "pedido_para_refazer"].includes(e.status)
     ).length;
@@ -210,13 +311,26 @@ export default function CriancaDashboard({
     const pedidoRefazer = eventos.some((e) => e.status === "pedido_para_refazer");
     const confirmadas = eventos.filter((e) => e.status === "confirmado").length;
 
+    // Trocas com o irmão, nesta tarefa e neste período.
+    const dessaTarefa = pedidosDaTarefa(t);
+    const meuPedido = dessaTarefa.find((p) => p.status === "pendente" && p.de_profile_id === profileId);
+    const pedidoRecebido = dessaTarefa.find(
+      (p) => p.status === "pendente" && p.para_profile_id === profileId
+    );
+    const peguei = dessaTarefa.find((p) => p.status === "aceito" && p.para_profile_id === profileId);
+    const passei = dessaTarefa.find((p) => p.status === "aceito" && p.de_profile_id === profileId);
+    // Bônus não se passa adiante: não tem dono nem obrigação, quem quiser faz.
+    const podePedir = t.categoria !== "coletiva" && vagas > 0 && !meuPedido && outrasCriancas.length > 0;
+
     return (
       <li className="card p-3 flex flex-col items-center text-center gap-1 h-full">
         <span className="text-3xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">
           R$ {Number(t.valor_unitario).toFixed(2)}
-          {total > 1 && <span className="text-slate-500"> · {total}× por dia</span>}
+          {(t.ocorrencias_por_dia || 1) > 1 && (
+            <span className="text-slate-500"> · {t.ocorrencias_por_dia}× por dia</span>
+          )}
         </p>
 
         <div className="flex flex-col items-center gap-1 mt-auto pt-1 w-full">
@@ -270,6 +384,56 @@ export default function CriancaDashboard({
               {total > 1 ? "tudo feito hoje ✓" : "confirmado ✓"}
             </span>
           )}
+
+          {peguei && (
+            <span className="text-xs text-sky-400 leading-tight">
+              você pegou essa de {nomeDe(peguei.de_profile_id)}
+            </span>
+          )}
+
+          {passei && (
+            <span className="text-xs text-sky-400 leading-tight">
+              {nomeDe(passei.para_profile_id)} ficou com essa
+            </span>
+          )}
+
+          {pedidoRecebido && (
+            <>
+              <span className="text-xs text-sky-400 leading-tight">
+                {nomeDe(pedidoRecebido.de_profile_id)} pediu que você faça
+              </span>
+              <div className="flex gap-1.5">
+                <BotaoDireto
+                  className="btn-primary text-xs px-2 py-0.5"
+                  acao={() => responderTroca(pedidoRecebido.id, "aceito")}
+                >
+                  aceitar
+                </BotaoDireto>
+                <BotaoDireto
+                  className="btn bg-gray-600 text-slate-100 hover:bg-gray-500 text-xs px-2 py-0.5"
+                  acao={() => responderTroca(pedidoRecebido.id, "recusado")}
+                >
+                  recusar
+                </BotaoDireto>
+              </div>
+            </>
+          )}
+
+          {meuPedido && (
+            <>
+              <span className="text-xs text-amber-400 leading-tight">
+                esperando {nomeDe(meuPedido.para_profile_id)} responder
+              </span>
+              <BotaoDireto
+                className="text-xs text-slate-500 underline disabled:opacity-40"
+                acao={() => cancelarTroca(meuPedido.id)}
+              >
+                cancelar pedido
+              </BotaoDireto>
+            </>
+          )}
+
+          {podePedir && <PedirTroca tarefa={t} familyId={familyId} outras={outrasCriancas} />}
         </div>
       </li>
     );
@@ -330,6 +494,15 @@ export default function CriancaDashboard({
       </>
     );
   }
+
+  // Combinados com o irmão, esperando resposta.
+  const trocasRecebidas = pedidosAtuais.filter(
+    (p) => p.status === "pendente" && p.para_profile_id === profileId
+  );
+  const trocasEnviadas = pedidosAtuais.filter(
+    (p) => p.status === "pendente" && p.de_profile_id === profileId
+  );
+  const nomeDaTarefa = (taskId: string) => catalog.find((t) => t.id === taskId)?.name ?? "Tarefa";
 
   const pendentesProprios = eventosMes.filter((e) =>
     ["aguardando_autorizacao", "aguardando_confirmacao"].includes(e.status)
@@ -413,7 +586,7 @@ export default function CriancaDashboard({
   // hoje (sexta/sábado, pra quem pula fim de semana) nunca entram aqui.
   const diariasEmRisco = obrigatoriasHoje.filter((t) => t.frequencia === "diaria" && ehMinhaVez(t) && aindaDaTempo(t));
   const valorEmRiscoHoje = diariasEmRisco.reduce(
-    (acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1),
+    (acc, t) => acc + Number(t.valor_unitario) * vagasRestantes(t).vagas,
     0
   );
 
@@ -432,6 +605,7 @@ export default function CriancaDashboard({
 
   return (
     <div>
+      <AtualizacaoAoVivo familyId={familyId} />
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === "inicio" && (
@@ -589,6 +763,58 @@ export default function CriancaDashboard({
             </div>
           </div>
 
+          {(trocasRecebidas.length > 0 || trocasEnviadas.length > 0) && (
+            <section className="mb-6">
+              <h2 className="text-lg font-semibold mb-1">🤝 Combinados com seu irmão</h2>
+              <p className="text-sm text-slate-400 mb-3">
+                Se você aceitar, a tarefa passa a ser sua hoje — e o valor dela também.
+              </p>
+              <ul className="space-y-2">
+                {trocasRecebidas.map((p) => (
+                  <li key={p.id} className="card flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium">{nomeDaTarefa(p.task_id)}</p>
+                      <p className="text-sm text-sky-400">
+                        {nomeDe(p.de_profile_id)} pediu que você faça no lugar dele
+                      </p>
+                    </div>
+                    <div className="flex gap-2 sm:shrink-0">
+                      <BotaoDireto
+                        className="btn-primary text-xs px-3 py-1"
+                        acao={() => responderTroca(p.id, "aceito")}
+                      >
+                        aceitar
+                      </BotaoDireto>
+                      <BotaoDireto
+                        className="btn bg-gray-600 text-slate-100 hover:bg-gray-500 text-xs px-3 py-1"
+                        acao={() => responderTroca(p.id, "recusado")}
+                      >
+                        recusar
+                      </BotaoDireto>
+                    </div>
+                  </li>
+                ))}
+
+                {trocasEnviadas.map((p) => (
+                  <li key={p.id} className="card flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium">{nomeDaTarefa(p.task_id)}</p>
+                      <p className="text-sm text-amber-400">
+                        você pediu para {nomeDe(p.para_profile_id)} — esperando a resposta
+                      </p>
+                    </div>
+                    <BotaoDireto
+                      className="text-xs text-slate-500 underline shrink-0 disabled:opacity-40"
+                      acao={() => cancelarTroca(p.id)}
+                    >
+                      cancelar pedido
+                    </BotaoDireto>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="mb-6">
             <div className="flex items-center justify-between mb-3 gap-2">
               <h2 className="text-lg font-semibold">Confirmações e autorizações pendentes</h2>
@@ -634,7 +860,7 @@ export default function CriancaDashboard({
             tarefas={catalog.filter(
               (t) =>
                 ehObrigatoria(t) &&
-                ehMinhaVez(t) &&
+                (ehMinhaVez(t) || passeiAdiante(t)) &&
                 t.frequencia === "diaria" &&
                 !(t.pula_fim_de_semana && ehSextaOuSabado)
             )}
@@ -647,7 +873,9 @@ export default function CriancaDashboard({
         <>
           <TextoDaAba>Essas são suas tarefas obrigatórias para fazer até o fim da semana.</TextoDaAba>
           <Catalogo
-            tarefas={catalog.filter((t) => ehObrigatoria(t) && ehMinhaVez(t) && t.frequencia === "semanal")}
+            tarefas={catalog.filter(
+              (t) => ehObrigatoria(t) && (ehMinhaVez(t) || passeiAdiante(t)) && t.frequencia === "semanal"
+            )}
             aba="semana"
           />
         </>

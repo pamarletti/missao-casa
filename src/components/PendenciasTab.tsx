@@ -4,7 +4,7 @@ import { registrarDireto, registrarAtrasada, decidir } from "@/app/app/[profileI
 import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
-import { valeParaCrianca, ehAVezDaCrianca } from "@/lib/dimensoes";
+import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
 
 type Tarefa = {
   id: string;
@@ -66,6 +66,7 @@ export default function PendenciasTab({
   eventos,
   hojeISO,
   atrasadas,
+  pedidos,
 }: {
   familyId: string;
   criancas: Crianca[];
@@ -73,10 +74,28 @@ export default function PendenciasTab({
   eventos: EventoSemana[];
   hojeISO: string;
   atrasadas: Atrasada[];
+  /** Trocas combinadas entre os meninos: mudam de quem é a tarefa hoje. */
+  pedidos: PedidoDeTroca[];
 }) {
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
-  // Mesma ordem usada no servidor, pra o rodízio bater entre as telas.
+  // Mesma ordem usada no servidor, pro rodízio bater entre as telas.
   const idsDasCriancas = criancas.map((c) => c.id);
+
+  // Só as trocas que ainda valem, e só as já aceitas — um pedido pendente
+  // não muda nada: até o irmão responder, a tarefa continua de quem pediu.
+  const trocasAceitas = pedidosVigentes(pedidos, catalog, hojeISO).filter((p) => p.status === "aceito");
+
+  /** Quantas vezes esta tarefa é desta criança hoje (ou nesta semana), já
+   * com o rodízio das compartilhadas e as trocas aplicados. Ver
+   * src/lib/trocas.ts — é a mesma conta que o painel do menino faz. */
+  const vezesDe = (t: Tarefa, profileId: string) =>
+    vezesNoPeriodo(t, profileId, idsDasCriancas, hojeISO, inicioDaSemana, trocasAceitas);
+
+  /** De quem esta criança pegou a tarefa, quando pegou de alguém. */
+  const pegouDe = (t: Tarefa, profileId: string) => {
+    const troca = trocasAceitas.find((p) => p.task_id === t.id && p.para_profile_id === profileId);
+    return troca ? criancas.find((c) => c.id === troca.de_profile_id)?.name : undefined;
+  };
 
   /** Situação de uma tarefa para uma criança, nesta janela.
    *
@@ -89,7 +108,7 @@ export default function PendenciasTab({
       (e) => e.task_id === t.id && e.profile_id === profileId && e.data >= janela
     );
 
-    const total = t.frequencia === "diaria" ? t.ocorrencias_por_dia || 1 : 1;
+    const total = vezesDe(t, profileId);
     const ocupadas = doFilho.filter((e) => !AINDA_DA_TEMPO.includes(e.status)).length;
 
     return {
@@ -109,11 +128,7 @@ export default function PendenciasTab({
       .map((t) => ({
         tarefa: t,
         porFilho: criancas
-          .filter(
-            (c) =>
-              valeParaCrianca(t, c.id) &&
-              ehAVezDaCrianca(t, c.id, idsDasCriancas, hojeISO, inicioDaSemana)
-          )
+          .filter((c) => vezesDe(t, c.id) > 0)
           .map((c) => ({ crianca: c, situacao: situacaoDoFilho(t, c.id) })),
       }))
       .filter((linha) => linha.porFilho.some((pf) => pf.situacao.vagas > 0 || pf.situacao.esperando));
@@ -148,6 +163,11 @@ export default function PendenciasTab({
                           {total > 1 && (
                             <span className="text-xs text-slate-500 ml-1">
                               ({ocupadas} de {total})
+                            </span>
+                          )}
+                          {pegouDe(tarefa, crianca.id) && (
+                            <span className="text-xs text-sky-400 ml-1">
+                              (no lugar de {pegouDe(tarefa, crianca.id)})
                             </span>
                           )}
                         </span>

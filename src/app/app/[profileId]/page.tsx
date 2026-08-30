@@ -12,7 +12,8 @@ import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
 import { calcularNivel, type NivelInfo } from "@/lib/nivelConstancia";
-import { valeParaCrianca, ehAVezDaCrianca } from "@/lib/dimensoes";
+import { valeParaCrianca } from "@/lib/dimensoes";
+import { vezesNoPeriodo, type PedidoDeTroca } from "@/lib/trocas";
 import NivelBadge from "@/components/NivelBadge";
 import type { Atrasada } from "@/components/PendenciasTab";
 import type { ResumoFeitas } from "@/components/ResumoFeitasCard";
@@ -121,6 +122,22 @@ export default async function Dashboard({
 
     const catalogoAtivo = (catalogoFamilia ?? []).filter((t) => t.ativo);
 
+    // Trocas combinadas entre os meninos (ver src/lib/trocas.ts): mudam de
+    // quem é cada tarefa no período, então entram tanto na aba Pendências
+    // quanto no cálculo das atrasadas. A janela é larga de propósito, pra
+    // pegar de uma vez as diárias (período = o dia), as semanais (a
+    // segunda-feira) e as mensais (o dia 1); o que sobrou de períodos que já
+    // viraram é descartado na hora de usar.
+    const { data: pedidosRaw, error: pedidosError } = await supabase
+      .from("pedidos_de_troca")
+      .select("id, task_id, de_profile_id, para_profile_id, periodo, status")
+      .eq("family_id", familyId)
+      .gte("periodo", diasAtras(today, 35))
+      .in("status", ["pendente", "aceito"]);
+    if (pedidosError) console.error("Erro ao buscar pedidos de troca:", pedidosError.message);
+    const pedidosDeTroca = (pedidosRaw ?? []) as PedidoDeTroca[];
+    const trocasAceitas = pedidosDeTroca.filter((p) => p.status === "aceito");
+
     // Nível de constância (só visual/motivacional — ver src/lib/nivelConstancia.ts):
     // % líquido das tarefas obrigatórias (individual + individual-coletiva)
     // cumprido por cada criança nos últimos 30 dias corridos.
@@ -220,9 +237,10 @@ export default async function Dashboard({
         const diaDaSemana = diaDaSemanaISO(dia);
         const eraSextaOuSabado = diaDaSemana === 5 || diaDaSemana === 6;
         for (const tarefa of diariasObrigatorias) {
-          if (!valeParaCrianca(tarefa, crianca.id)) continue;
-          // Numa compartilhada, só cobra de quem era a vez NAQUELE dia.
-          if (!ehAVezDaCrianca(tarefa, crianca.id, idsDasCriancas, dia, inicioDaSemana)) continue;
+          // Só cobra de quem era o responsável NAQUELE dia: numa
+          // compartilhada, de quem era a vez; numa troca aceita, de quem
+          // pegou a tarefa (e nunca mais de quem a passou adiante).
+          if (vezesNoPeriodo(tarefa, crianca.id, idsDasCriancas, dia, inicioDaSemana, trocasAceitas) <= 0) continue;
           if (tarefa.pula_fim_de_semana && eraSextaOuSabado) continue;
           if (jaTemRegistroDiario.has(`${crianca.id}|${tarefa.id}|${dia}`)) continue;
           atrasadas.push({ data: dia, taskId: tarefa.id, profileId: crianca.id });
@@ -318,6 +336,7 @@ export default async function Dashboard({
           resumoFeitas={resumoFeitasPorPerfil}
           valorBaseObrigatorias={valorBaseObrigatorias}
           nivelPorPerfil={nivelPorPerfil}
+          pedidosDeTroca={pedidosDeTroca}
         />
       </Shell>
     );
@@ -369,16 +388,37 @@ export default async function Dashboard({
   // rodízio das compartilhadas daria respostas diferentes em cada uma.
   const { data: irmaosRaw } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, name")
     .eq("family_id", familyId)
     .eq("kind", "crianca")
     .order("name");
-  const idsDasCriancas = (irmaosRaw ?? []).map((p) => p.id);
+  const irmaos = (irmaosRaw ?? []).map((p) => ({ id: p.id as string, name: p.name as string }));
+  const idsDasCriancas = irmaos.map((p) => p.id);
+
+  // Trocas combinadas entre os meninos — ver src/lib/trocas.ts. Janela larga
+  // de propósito (diárias, semanais e mensais de uma vez); o painel filtra
+  // o que ainda vale.
+  const { data: pedidosCriancaRaw, error: pedidosCriancaError } = await supabase
+    .from("pedidos_de_troca")
+    .select("id, task_id, de_profile_id, para_profile_id, periodo, status")
+    .eq("family_id", familyId)
+    .gte("periodo", diasAtras(today, 35))
+    .in("status", ["pendente", "aceito"]);
+  if (pedidosCriancaError) console.error("Erro ao buscar pedidos de troca:", pedidosCriancaError.message);
+  const pedidosDeTroca = (pedidosCriancaRaw ?? []) as PedidoDeTroca[];
 
   // Tudo que vale pra este menino. O rodízio das compartilhadas é aplicado
   // na tela (CriancaDashboard), só nas listas do que dá pra fazer agora — a
   // projeção do mês precisa do catálogo inteiro pra contar direito.
-  const catalogDoPerfil = (catalog ?? []).filter((t) => valeParaCrianca(t, profile.id));
+  // Uma tarefa que chegou por troca precisa aparecer pra ele mesmo quando
+  // não era dele de origem (uma compartilhada restrita ao irmão, por
+  // exemplo) — senão o pedido chegaria e não teria onde ser feito.
+  const porTroca = new Set(
+    pedidosDeTroca.filter((p) => p.para_profile_id === profile.id).map((p) => p.task_id)
+  );
+  const catalogDoPerfil = (catalog ?? []).filter(
+    (t) => valeParaCrianca(t, profile.id) || porTroca.has(t.id)
+  );
 
   const eventos = eventosMes ?? [];
   const feitasMes = eventos.filter((e) => e.status === "confirmado").length;
@@ -505,6 +545,8 @@ export default async function Dashboard({
         naoFeitasMes={naoFeitasMes}
         totaisAtividades={totaisAtividades}
         numCriancas={numCriancas}
+        irmaos={irmaos}
+        pedidos={pedidosDeTroca}
       />
     </Shell>
   );

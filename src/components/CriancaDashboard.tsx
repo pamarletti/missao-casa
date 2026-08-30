@@ -353,9 +353,17 @@ export default function CriancaDashboard({
           {pedidoRefazer && <span className="text-xs text-amber-400">pedido para refazer</span>}
 
           {liberada && (
-            <form action={markColetivaDone.bind(null, liberada.id)} className="w-full">
-              <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
-            </form>
+            <>
+              <form action={markColetivaDone.bind(null, liberada.id)} className="w-full">
+                <BotaoAcao className="btn-primary text-xs w-full">Feito</BotaoAcao>
+              </form>
+              <BotaoDireto
+                className="text-xs text-slate-500 underline disabled:opacity-40"
+                acao={() => cancelarPropriaMarcacao(liberada.id)}
+              >
+                desistir
+              </BotaoDireto>
+            </>
           )}
 
           {!liberada && vagas > 0 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { registrarDireto, registrarAtrasada, decidir } from "@/app/app/[profileId]/actions";
+import { registrarDireto, registrarAtrasada, decidir, desfazerEvento } from "@/app/app/[profileId]/actions";
 import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
@@ -56,6 +56,19 @@ const ESPERANDO_DECISAO = ["aguardando_confirmacao", "aguardando_autorizacao"];
  * tarefa segue na lista com os botões ✓/✗ disponíveis, então dá pra
  * mudar de ideia — inclusive pra corrigir um ✗ clicado por engano. */
 const AINDA_DA_TEMPO = ["nao_feito", "pedido_para_refazer"];
+
+/** Estados em que alguém já decidiu alguma coisa — e que, por isso, dá pra
+ * desfazer ali mesmo, sem ter que caçar o registro no Histórico. Fica de
+ * fora só o que ainda está esperando decisão: ali os botões ✓ e ↺ já
+ * resolvem, e apagar o pedido do menino é papel dele, não do adulto. */
+const JA_DECIDIDO = [
+  "confirmado",
+  "nao_feito",
+  "pedido_para_refazer",
+  "desconto_automatico",
+  "desconsiderada",
+  "liberada",
+];
 
 const STATUS_LABEL: Record<string, string> = {
   aguardando_autorizacao: "aguardando autorização",
@@ -140,6 +153,22 @@ export default function PendenciasTab({
       naoFeito: doFilho.some((e) => AINDA_DA_TEMPO.includes(e.status)),
       ultimo: doFilho[doFilho.length - 1],
     };
+  }
+
+  /** O "desfazer" que faltava fora do Histórico: apaga o registro e deixa a
+   * tarefa como se nada tivesse acontecido, pra corrigir um ✓ ou um ✗
+   * clicado por engano na hora em que se percebe o erro. */
+  function Desfazer({ evento }: { evento?: EventoSemana }) {
+    if (!evento || !JA_DECIDIDO.includes(evento.status)) return null;
+    return (
+      <BotaoDireto
+        className="text-xs text-slate-500 underline shrink-0 disabled:opacity-40"
+        title="Desfazer esta decisão"
+        acao={() => desfazerEvento(evento.id)}
+      >
+        desfazer
+      </BotaoDireto>
+    );
   }
 
   function Bloco({ titulo, descricao, tarefas }: { titulo: string; descricao: string; tarefas: Tarefa[] }) {
@@ -238,11 +267,15 @@ export default function PendenciasTab({
                                 ✗
                               </BotaoAcao>
                             </form>
+                            <Desfazer evento={ultimo} />
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400">
-                            {total > 1 ? "tudo feito ✓" : STATUS_LABEL[ultimo?.status ?? ""] ?? ultimo?.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400">
+                              {total > 1 ? "tudo feito ✓" : STATUS_LABEL[ultimo?.status ?? ""] ?? ultimo?.status}
+                            </span>
+                            <Desfazer evento={ultimo} />
+                          </div>
                         )}
                       </li>
                     );

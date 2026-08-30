@@ -278,7 +278,12 @@ export async function cancelarPropriaMarcacao(eventId: string) {
     .delete()
     .eq("id", eventId)
     .eq("profile_id", active.profileId)
-    .in("status", ["aguardando_autorizacao", "aguardando_confirmacao"]);
+    // "liberada" entra aqui: o menino pediu pra fazer uma coletiva, o
+    // responsável autorizou, e ele mudou de ideia antes de fazer. Sem isso
+    // o pedido ficava preso — nem ele desfazia, nem o adulto via em lugar
+    // nenhum. Estados já decididos (confirmado, não feito) continuam de
+    // fora: quem desfaz aquilo é o responsável.
+    .in("status", ["aguardando_autorizacao", "aguardando_confirmacao", "liberada"]);
 
   revalidatePath(`/app/${active.profileId}`);
 }

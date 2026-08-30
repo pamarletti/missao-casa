@@ -140,3 +140,32 @@ export function escalarParaTotalMensal<T extends TarefaValorBase>(
 
   return itens.map((i) => ({ tarefa: i.tarefa, valorUnitario: i.cent / 100 }));
 }
+
+/** Entre quantas crianças a tarefa se reveza. 1 = ninguém alterna (é de
+ * cada um, ou é bônus de quem quiser). Só as de finalidade
+ * "Compartilhadas" entram no rodízio — ver ehAVezDaCrianca em
+ * src/lib/dimensoes.ts. */
+export function divisorDoRodizio(
+  t: { finalidade?: string | null; profile_ids?: string[] | null },
+  numCriancas: number
+): number {
+  if (t.finalidade !== "Compartilhadas") return 1;
+  const participantes = t.profile_ids?.length ? t.profile_ids.length : numCriancas;
+  return Math.max(1, participantes);
+}
+
+/** Quanto UMA criança consegue tirar por mês do conjunto de tarefas.
+ *
+ * Diferente de valorMensalTotal, que soma como se tudo valesse pra todo
+ * mundo: numa tarefa compartilhada que alterna entre dois meninos, cada um
+ * só pega metade das vezes, então ela entra pela metade. É esse o número
+ * que precisa fechar no valor base — é o teto real de cada um. */
+export function valorMensalPorCrianca(
+  tarefas: (TarefaValorBase & { finalidade?: string | null; profile_ids?: string[] | null })[],
+  numCriancas: number
+): number {
+  return tarefas.reduce(
+    (acc, t) => acc + (Number(t.valor_unitario) * ocorrenciasPorMes(t)) / divisorDoRodizio(t, numCriancas),
+    0
+  );
+}

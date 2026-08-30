@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { markOrRequest, markColetivaDone, cancelarPropriaMarcacao } from "@/app/app/[profileId]/actions";
-import { inicioDaJanela } from "@/lib/periodos";
+import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
-import { ocorrenciasPorMes, ocorrenciasPorSemana } from "@/lib/valorBase";
+import { ocorrenciasPorMes, ocorrenciasPorSemana, divisorDoRodizio } from "@/lib/valorBase";
 import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import ListaAgrupada from "@/components/ListaAgrupada";
 import ListaPorArea from "@/components/ListaPorArea";
-import { ehObrigatoria } from "@/lib/dimensoes";
+import { ehObrigatoria, ehAVezDaCrianca } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 
@@ -92,6 +92,7 @@ function TextoDaAba({ children }: { children: React.ReactNode }) {
 
 export default function CriancaDashboard({
   nome,
+  profileId,
   familyId,
   today,
   catalog,
@@ -105,8 +106,10 @@ export default function CriancaDashboard({
   naoFeitasMes,
   totaisAtividades,
   numCriancas,
+  idsDasCriancas,
 }: {
   nome: string;
+  profileId: string;
   familyId: string;
   today: string;
   catalog: Tarefa[];
@@ -120,8 +123,15 @@ export default function CriancaDashboard({
   naoFeitasMes: number;
   totaisAtividades: TotaisAtividades;
   numCriancas: number;
+  /** Ordem das crianças da família, pro rodízio das compartilhadas. */
+  idsDasCriancas: string[];
 }) {
   const [tab, setTab] = useState<TabKey>("inicio");
+
+  /** Nas tarefas compartilhadas, os meninos se revezam: hoje é de um,
+   * amanhã do outro. Vale só para as listas do que dá pra fazer agora — as
+   * projeções contam o mês todo, com a fração que cabe a cada um. */
+  const ehMinhaVez = (t: Tarefa) => ehAVezDaCrianca(t, profileId, idsDasCriancas, today, inicioDaSemana);
   const { abertas: secoesAbertas, alternar: alternarSecao } = useSecoesExpansiveis();
 
   // Relógio ao vivo (atualiza a cada 30s) pra contagem regressiva do fim do
@@ -333,11 +343,19 @@ export default function CriancaDashboard({
   // "hoje" quando hoje é um dia em que elas realmente valem.
   const obrigatorias = catalog.filter((t) => t.categoria !== "coletiva");
   const obrigatoriasHoje = obrigatorias.filter((t) => !(t.pula_fim_de_semana && ehSextaOuSabado));
+  // Nas compartilhadas, cada menino pega só a fração que o rodízio dá a ele.
+  const fracao = (t: Tarefa) => 1 / divisorDoRodizio(t, numCriancas);
   const potencialDia = obrigatoriasHoje
     .filter((t) => t.frequencia === "diaria")
-    .reduce((acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1), 0);
-  const potencialSemana = obrigatorias.reduce((acc, t) => acc + Number(t.valor_unitario) * ocorrenciasPorSemana(t), 0);
-  const potencialMes = obrigatorias.reduce((acc, t) => acc + Number(t.valor_unitario) * ocorrenciasPorMes(t), 0);
+    .reduce((acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1) * fracao(t), 0);
+  const potencialSemana = obrigatorias.reduce(
+    (acc, t) => acc + Number(t.valor_unitario) * ocorrenciasPorSemana(t) * fracao(t),
+    0
+  );
+  const potencialMes = obrigatorias.reduce(
+    (acc, t) => acc + Number(t.valor_unitario) * ocorrenciasPorMes(t) * fracao(t),
+    0
+  );
 
   const idsObrigatorias = new Set(obrigatorias.map((t) => t.id));
   // Só conta no progresso do dia o que já foi confirmado pelo responsável —
@@ -393,13 +411,13 @@ export default function CriancaDashboard({
   // ainda não foram feitas — inclusive as marcadas como "não feito", que
   // continuam valendo enquanto a janela não virar. Tarefas que não valem
   // hoje (sexta/sábado, pra quem pula fim de semana) nunca entram aqui.
-  const diariasEmRisco = obrigatoriasHoje.filter((t) => t.frequencia === "diaria" && aindaDaTempo(t));
+  const diariasEmRisco = obrigatoriasHoje.filter((t) => t.frequencia === "diaria" && ehMinhaVez(t) && aindaDaTempo(t));
   const valorEmRiscoHoje = diariasEmRisco.reduce(
     (acc, t) => acc + Number(t.valor_unitario) * (t.ocorrencias_por_dia || 1),
     0
   );
 
-  const semanaisEmRisco = obrigatorias.filter((t) => t.frequencia === "semanal" && aindaDaTempo(t));
+  const semanaisEmRisco = obrigatorias.filter((t) => t.frequencia === "semanal" && ehMinhaVez(t) && aindaDaTempo(t));
   const valorEmRiscoSemana = semanaisEmRisco.reduce((acc, t) => acc + Number(t.valor_unitario), 0);
 
   // "Tem um tempinho?": até 4 sugestões de tarefas rápidas pra fazer agora,
@@ -616,6 +634,7 @@ export default function CriancaDashboard({
             tarefas={catalog.filter(
               (t) =>
                 ehObrigatoria(t) &&
+                ehMinhaVez(t) &&
                 t.frequencia === "diaria" &&
                 !(t.pula_fim_de_semana && ehSextaOuSabado)
             )}
@@ -628,7 +647,7 @@ export default function CriancaDashboard({
         <>
           <TextoDaAba>Essas são suas tarefas obrigatórias para fazer até o fim da semana.</TextoDaAba>
           <Catalogo
-            tarefas={catalog.filter((t) => ehObrigatoria(t) && t.frequencia === "semanal")}
+            tarefas={catalog.filter((t) => ehObrigatoria(t) && ehMinhaVez(t) && t.frequencia === "semanal")}
             aba="semana"
           />
         </>

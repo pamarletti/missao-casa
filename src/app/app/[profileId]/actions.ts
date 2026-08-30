@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveProfile, clearActiveProfile } from "@/lib/activeProfile";
-import { valorMensalTotal, escalarParaTotalMensal } from "@/lib/valorBase";
+import {
+  valorMensalTotal,
+  valorMensalPorCrianca,
+  divisorDoRodizio,
+  escalarParaTotalMensal,
+} from "@/lib/valorBase";
 import { inicioDaJanela, hojeEmRecife } from "@/lib/periodos";
 
 async function requireActiveProfile() {
@@ -439,12 +444,20 @@ export async function marcarDesnecessaria(taskId: string, desnecessaria: boolean
   if (tarefa && (tarefa.categoria === "individual" || tarefa.categoria === "individual_coletiva")) {
     const { data: obrigatorias } = await supabase
       .from("task_catalog")
-      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")
+      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana, finalidade, profile_ids")
       .eq("family_id", tarefa.family_id)
       .in("categoria", ["individual", "individual_coletiva"])
       .eq("ativo", true);
 
-    const novoTotal = valorMensalTotal(obrigatorias ?? []);
+    const { count: numCriancasRaw } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("family_id", tarefa.family_id)
+      .eq("kind", "crianca");
+
+    // Teto de UMA criança: as compartilhadas entram pela fração que cabe a
+    // cada uma, já que elas se revezam.
+    const novoTotal = valorMensalPorCrianca(obrigatorias ?? [], numCriancasRaw && numCriancasRaw > 0 ? numCriancasRaw : 1);
     await supabase
       .from("families")
       .update({ valor_base_obrigatorias: Math.round(novoTotal * 100) / 100 })
@@ -551,12 +564,20 @@ export async function editarTarefa(formData: FormData) {
   if (tarefaEditada) {
     const { data: obrigatorias } = await supabase
       .from("task_catalog")
-      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")
+      .select("valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana, finalidade, profile_ids")
       .eq("family_id", tarefaEditada.family_id)
       .in("categoria", ["individual", "individual_coletiva"])
       .eq("ativo", true);
 
-    const novoTotal = valorMensalTotal(obrigatorias ?? []);
+    const { count: numCriancasRaw } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("family_id", tarefaEditada.family_id)
+      .eq("kind", "crianca");
+
+    // Teto de UMA criança: as compartilhadas entram pela fração que cabe a
+    // cada uma, já que elas se revezam.
+    const novoTotal = valorMensalPorCrianca(obrigatorias ?? [], numCriancasRaw && numCriancasRaw > 0 ? numCriancasRaw : 1);
     await supabase
       .from("families")
       .update({ valor_base_obrigatorias: Math.round(novoTotal * 100) / 100 })
@@ -585,7 +606,7 @@ export async function definirValorBase(formData: FormData) {
   const supabase = createClient();
   const { data: obrigatorias } = await supabase
     .from("task_catalog")
-    .select("id, valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana")
+    .select("id, valor_unitario, frequencia, ocorrencias_por_dia, pula_fim_de_semana, finalidade, profile_ids")
     .eq("family_id", familyId)
     .in("categoria", ["individual", "individual_coletiva"])
     .eq("ativo", true);
@@ -595,10 +616,31 @@ export async function definirValorBase(formData: FormData) {
     return;
   }
 
+  const { count: numCriancasRaw } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("family_id", familyId)
+    .eq("kind", "crianca");
+  const numCriancas = numCriancasRaw && numCriancasRaw > 0 ? numCriancasRaw : 1;
+
+  // As compartilhadas se revezam, então cada menino só pega uma fração
+  // delas. Elas ficam fora da escala (o rodízio é que define a parte de
+  // cada um), e o alvo a distribuir entre as outras é o que sobra depois de
+  // descontar o que já vem delas.
+  const seRevezam = obrigatorias.filter((t) => divisorDoRodizio(t, numCriancas) > 1);
+  const escalaveis = obrigatorias.filter((t) => divisorDoRodizio(t, numCriancas) === 1);
+  const jaVemDasCompartilhadas = valorMensalPorCrianca(seRevezam, numCriancas);
+  const alvoDasOutras = novoValor - jaVemDasCompartilhadas;
+
+  if (escalaveis.length === 0 || alvoDasOutras <= 0) {
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
   // Escala mantendo os valores em centavos redondos E fazendo a soma bater
   // exata com o alvo — ver escalarParaTotalMensal para o porquê de não ser
   // só multiplicar cada valor pelo fator e arredondar.
-  const escalonadas = escalarParaTotalMensal(obrigatorias, novoValor);
+  const escalonadas = escalarParaTotalMensal(escalaveis, alvoDasOutras);
   if (escalonadas.length === 0) {
     revalidatePath(`/app/${active.profileId}`);
     return;
@@ -613,9 +655,9 @@ export async function definirValorBase(formData: FormData) {
   // normais os dois são idênticos, e quando não dá para fechar exato (alvo de
   // centavo ímpar) isso evita que o card fique acusando divergência para
   // sempre.
-  const totalAlcancado = valorMensalTotal(
-    escalonadas.map(({ tarefa, valorUnitario }) => ({ ...tarefa, valor_unitario: valorUnitario })),
-  );
+  const totalAlcancado =
+    valorMensalTotal(escalonadas.map(({ tarefa, valorUnitario }) => ({ ...tarefa, valor_unitario: valorUnitario }))) +
+    jaVemDasCompartilhadas;
   await supabase
     .from("families")
     .update({ valor_base_obrigatorias: Math.round(totalAlcancado * 100) / 100 })

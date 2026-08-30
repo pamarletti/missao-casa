@@ -375,11 +375,10 @@ export default async function Dashboard({
     .order("name");
   const idsDasCriancas = (irmaosRaw ?? []).map((p) => p.id);
 
-  // Este menino só vê (e só é cobrado por) o que vale pra ele — e, nas
-  // compartilhadas, só quando é a vez dele.
-  const catalogDoPerfil = (catalog ?? []).filter(
-    (t) => valeParaCrianca(t, profile.id) && ehAVezDaCrianca(t, profile.id, idsDasCriancas, today, inicioDaSemana)
-  );
+  // Tudo que vale pra este menino. O rodízio das compartilhadas é aplicado
+  // na tela (CriancaDashboard), só nas listas do que dá pra fazer agora — a
+  // projeção do mês precisa do catálogo inteiro pra contar direito.
+  const catalogDoPerfil = (catalog ?? []).filter((t) => valeParaCrianca(t, profile.id));
 
   const eventos = eventosMes ?? [];
   const feitasMes = eventos.filter((e) => e.status === "confirmado").length;
@@ -491,9 +490,11 @@ export default async function Dashboard({
     >
       <CriancaDashboard
         nome={profile.name}
+        profileId={profile.id}
         familyId={familyId}
         today={today}
         catalog={catalogDoPerfil}
+        idsDasCriancas={idsDasCriancas}
         eventosMes={eventos}
         atividades={atividades}
         saldoAtual={saldoAtual}

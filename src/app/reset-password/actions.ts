@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { mensagemDeErro } from "@/lib/erros";
 
 export async function resetPassword(formData: FormData) {
   const password = String(formData.get("password") || "");
@@ -33,7 +34,7 @@ export async function resetPassword(formData: FormData) {
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
-    redirect(`/reset-password?erro=${encodeURIComponent(error.message)}`);
+    redirect(`/reset-password?erro=${encodeURIComponent(mensagemDeErro(error.message))}`);
   }
 
   await supabase.auth.signOut();

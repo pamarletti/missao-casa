@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { mensagemDeErro } from "@/lib/erros";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") || "");
@@ -11,7 +12,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?erro=${encodeURIComponent(error.message)}`);
+    redirect(`/login?erro=${encodeURIComponent(mensagemDeErro(error.message))}`);
   }
 
   redirect("/app");

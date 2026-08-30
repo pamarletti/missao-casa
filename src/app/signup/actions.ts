@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { mensagemDeErro } from "@/lib/erros";
 
 export async function signup(formData: FormData) {
   const familyName = String(formData.get("familyName") || "Minha família");
@@ -19,10 +20,7 @@ export async function signup(formData: FormData) {
 
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) {
-    const mensagem = /already registered|already exists/i.test(error.message)
-      ? 'Esse e-mail já tem uma conta cadastrada. Tenta entrar, ou usa "Esqueci minha senha" se não lembrar a senha.'
-      : error.message;
-    redirect(`/signup?erro=${encodeURIComponent(mensagem)}`);
+    redirect(`/signup?erro=${encodeURIComponent(mensagemDeErro(error.message))}`);
   }
   if (!data.user) {
     redirect(`/signup?erro=${encodeURIComponent("Não deu para criar a conta")}`);

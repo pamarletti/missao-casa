@@ -81,7 +81,9 @@ export default function ListaAgrupada<T extends Base>({
         />
 
         <div>
-          <p className="text-xs text-slate-400 mb-2">Agrupar por:</p>
+          <p className="text-xs text-slate-400 mb-2">
+            Agrupar por {opcoes.find((d) => d.key === dimensao)?.label ?? ""}:
+          </p>
           <div className="flex flex-wrap gap-2">
             {opcoes.map((d) => (
               <button

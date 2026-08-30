@@ -9,6 +9,7 @@ import TabBar from "@/components/TabBar";
 import Atividades, { type AtividadeItem } from "@/components/Atividades";
 import TotaisAtividadesCard, { type TotaisAtividades } from "@/components/TotaisAtividades";
 import ListaAgrupada from "@/components/ListaAgrupada";
+import ListaPorArea from "@/components/ListaPorArea";
 import { ehObrigatoria } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
@@ -60,7 +61,7 @@ type EventoMes = {
 const CATEGORIA_LABEL: Record<string, string> = {
   individual: "Suas tarefas",
   individual_coletiva: "Seu espaço compartilhado",
-  coletiva: "Tarefas coletivas (bônus)",
+  coletiva: "Tarefas de bônus",
 };
 
 // Obrigatórias sempre antes das coletivas (bônus), quando o catálogo é
@@ -634,13 +635,9 @@ export default function CriancaDashboard({
 
       {tab === "coletivas" && (
         <>
-          <TextoDaAba>
-            Essas são tarefas que você pode fazer pela família e que vão garantir uma grana extra.
-          </TextoDaAba>
-          <ListaAgrupada
+          <TextoDaAba>Essas são tarefas que você pode fazer que vão garantir uma grana extra.</TextoDaAba>
+          <ListaPorArea
             tarefas={catalog.filter((t) => !ehObrigatoria(t))}
-            dimensoes={["comodo", "finalidade"]}
-            chaveAba="bonus"
             renderItem={(t) => <TarefaRow t={t} />}
           />
         </>

@@ -288,14 +288,63 @@ export async function cancelarPropriaMarcacao(eventId: string) {
   revalidatePath(`/app/${active.profileId}`);
 }
 
-/** Um responsável desfaz qualquer evento já decidido (confirmado, não
- * feito, liberado, pedido para refazer) — corrige um clique errado a
- * qualquer momento, a partir do histórico de Atividades. */
+/** Um responsável desfaz um evento já decidido (confirmado, não feito,
+ * liberado, pedido para refazer) — corrige um clique errado a qualquer
+ * momento, pela aba de Pendências ou pelo histórico de Atividades.
+ *
+ * Desfazer costuma ser apagar o registro: a tarefa volta a ficar como se
+ * nada tivesse acontecido. Mas há um caso em que apagar seria injusto — o
+ * de uma decisão que só existe DEPOIS de o menino ter marcado a tarefa como
+ * feita. "Pedido para refazer" e "não feito" são gravados POR CIMA da
+ * marcação dele, na mesma linha; apagar a linha apagaria junto o trabalho
+ * do menino, e a tarefa reapareceria como se ele nunca tivesse encostado
+ * nela.
+ *
+ * Nesses casos o desfazer devolve a tarefa ao estado de onde veio:
+ * "aguardando confirmação", com o valor de volta (as duas decisões zeram o
+ * valor da linha), esperando o ✓ do responsável.
+ *
+ * Como saber se o menino marcou? Pela coluna `origem`: "menino" quer dizer
+ * que a linha nasceu de uma marcação dele; "responsavel" quer dizer que o
+ * adulto lançou o resultado direto, sem ela ter existido — e aí apagar é o
+ * certo, porque não há marcação nenhuma a devolver. */
 export async function desfazerEvento(eventId: string) {
   const active = await requireActiveProfile();
   if (active.kind !== "responsavel") return;
 
   const supabase = createClient();
+
+  const { data: evento } = await supabase
+    .from("task_events")
+    .select("status, task_id, origem")
+    .eq("id", eventId)
+    .single();
+
+  const respostaAUmaMarcacao =
+    evento?.origem === "menino" &&
+    (evento?.status === "pedido_para_refazer" || evento?.status === "nao_feito");
+
+  if (respostaAUmaMarcacao) {
+    const { data: task } = await supabase
+      .from("task_catalog")
+      .select("valor_unitario")
+      .eq("id", evento.task_id)
+      .single();
+
+    await supabase
+      .from("task_events")
+      .update({
+        status: "aguardando_confirmacao",
+        valor: task?.valor_unitario ?? 0,
+        confirmado_por: null,
+        confirmado_em: null,
+      })
+      .eq("id", eventId);
+
+    revalidatePath(`/app/${active.profileId}`);
+    return;
+  }
+
   await supabase.from("task_events").delete().eq("id", eventId);
 
   revalidatePath(`/app/${active.profileId}`);

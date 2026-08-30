@@ -28,6 +28,12 @@ type Tarefa = {
   profile_ids: string[] | null;
 };
 
+/** Traduz a tarefa para a opção de frequência que a tela mostra. */
+function modoDe(t: Tarefa): string {
+  if (t.frequencia === "diaria") return (t.ocorrencias_por_dia || 1) > 1 ? "diaria_varias" : "diaria";
+  return t.frequencia;
+}
+
 /** Um <select> por classificação: uma opção só em cada, como pediu a
  * Paolla. As opções de Cômodo/Área vêm do próprio catálogo, então a lista
  * acompanha o que a família já usa. */
@@ -50,7 +56,7 @@ function CampoCategoria({
     <label className="text-xs text-slate-400">
       {rotulo}
       <select
-        name={nome}
+        {...(nome ? { name: nome } : {})}
         {...(onChange ? { value: valor, onChange: (e) => onChange(e.target.value) } : { defaultValue: valor })}
         className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-xl px-2 py-1.5 text-sm text-slate-100"
       >
@@ -75,6 +81,10 @@ function ItemEditavel({
 }) {
   const [editando, setEditando] = useState(false);
   const [finalidade, setFinalidade] = useState(t.finalidade ?? "Para mim");
+  // "diaria_varias" não é um valor do banco: é só a opção da tela que faz
+  // aparecer o campo de quantas vezes. No banco continua frequencia
+  // "diaria" + ocorrencias_por_dia.
+  const [modoFrequencia, setModoFrequencia] = useState(modoDe(t));
 
   if (!editando) {
     return (
@@ -87,6 +97,7 @@ function ItemEditavel({
           className="text-xs text-slate-500 underline mt-1"
           onClick={() => {
             setFinalidade(t.finalidade ?? "Para mim");
+            setModoFrequencia(modoDe(t));
             setEditando(true);
           }}
         >
@@ -134,15 +145,29 @@ function ItemEditavel({
             ]}
           />
           <CampoCategoria
-            nome="frequencia"
+            nome=""
             rotulo="Frequência"
-            valor={t.frequencia}
+            valor={modoFrequencia}
+            onChange={setModoFrequencia}
             opcoes={[
               { value: "diaria", label: "Diária" },
+              { value: "diaria_varias", label: "Diária, mais de uma vez por dia" },
               { value: "semanal", label: "Semanal" },
               { value: "mensal", label: "Mensal" },
             ]}
           />
+          <input type="hidden" name="frequencia" value={modoFrequencia === "diaria_varias" ? "diaria" : modoFrequencia} />
+
+          {modoFrequencia === "diaria_varias" ? (
+            <CampoCategoria
+              nome="ocorrencias_por_dia"
+              rotulo="Quantas vezes por dia"
+              valor={String(Math.max(2, t.ocorrencias_por_dia || 2))}
+              opcoes={[2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n}× por dia` }))}
+            />
+          ) : (
+            <input type="hidden" name="ocorrencias_por_dia" value="1" />
+          )}
           <CampoCategoria
             nome="finalidade"
             rotulo="Finalidade"

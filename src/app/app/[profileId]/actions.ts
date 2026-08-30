@@ -491,8 +491,13 @@ export async function editarTarefa(formData: FormData) {
   if (comodo) patch.comodo = comodo;
   if (FREQUENCIAS.includes(frequencia)) {
     patch.frequencia = frequencia;
-    // "vezes por dia" só faz sentido em tarefa diária.
-    if (frequencia !== "diaria") patch.ocorrencias_por_dia = 1;
+    // "vezes por dia" só faz sentido em tarefa diária; nas outras volta a 1.
+    if (frequencia !== "diaria") {
+      patch.ocorrencias_por_dia = 1;
+    } else {
+      const vezes = Math.floor(Number(formData.get("ocorrencias_por_dia") || 1));
+      patch.ocorrencias_por_dia = Number.isFinite(vezes) && vezes >= 1 && vezes <= 12 ? vezes : 1;
+    }
   }
 
   // `categoria` é a coluna antiga, que ainda comanda regras do app (quem

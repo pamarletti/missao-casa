@@ -122,7 +122,7 @@ function CampoPin({
   return (
     <div>
       <input type="hidden" name={name} value={valor} />
-      <div className="flex items-center gap-2" role="group" aria-label={placeholder}>
+      <div className="flex items-center gap-1.5" role="group" aria-label={placeholder}>
         {digitos.map((d, i) => (
           <input
             key={i}
@@ -134,18 +134,23 @@ function CampoPin({
             }}
             type="text"
             inputMode="numeric"
+            // Marca de campo de código de verificação. Alguns gerenciadores
+            // de senha usam justamente isso pra pular o campo; a colagem de
+            // vários dígitos de uma vez continua funcionando, porque quem
+            // distribui os números pelas caixas é o onChange, não o campo.
+            maxLength={1}
             autoComplete="off"
             data-1p-ignore="true"
             data-lpignore="true"
             data-bwignore="true"
             data-form-type="other"
-            aria-label={`${placeholder} — ${i + 1}º número`}
+            aria-label={`${i + 1}º número de ${tamanho}`}
             autoFocus={autoFocus && i === 0}
             value={d ? (visivel ? d : "•") : ""}
             onChange={(e) => escrever(i, e.target.value)}
             onKeyDown={(e) => aoTeclar(i, e)}
             onFocus={(e) => e.target.select()}
-            className="w-12 text-center text-lg px-0"
+            className="w-10 h-10 text-center text-base rounded-lg px-0 py-0"
           />
         ))}
         <button

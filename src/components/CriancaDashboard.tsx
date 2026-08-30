@@ -151,19 +151,34 @@ export default function CriancaDashboard({
     return eventosMes.filter((e) => e.task_id === taskId && e.data >= janela);
   }
 
-  /** Quantas vezes a tarefa ainda pode ser marcada nesta janela.
+  /** Estados em que o pedido ainda está correndo: ou esperando o
+   * responsável decidir, ou já liberado esperando o menino fazer. */
+  const EM_ANDAMENTO = ["aguardando_autorizacao", "liberada", "aguardando_confirmacao"];
+
+  /** Quantas vezes a tarefa ainda pode ser marcada agora.
    *
-   * Tarefas que acontecem várias vezes por dia (lavar a louça e pôr a mesa
-   * são 3× ao dia, lavar panelas 2×) voltam pra lista depois de cada
-   * marcação, até completarem as vezes do dia — é o `ocorrencias_por_dia`
-   * do catálogo, o mesmo número que já era usado pra calcular quanto a
-   * tarefa rende por mês.
+   * OBRIGATÓRIAS têm cota por janela: as que acontecem várias vezes por dia
+   * (lavar a louça e pôr a mesa são 3× ao dia, lavar panelas 2×) voltam pra
+   * lista depois de cada marcação, até completarem as vezes do dia — é o
+   * `ocorrencias_por_dia` do catálogo, o mesmo número usado pra calcular
+   * quanto a tarefa rende por mês. "Não feito" e "pedido para refazer" não
+   * ocupam vaga: enquanto a janela não virar, ainda dá tempo de fazer.
    *
-   * "Não feito" e "pedido para refazer" não ocupam vaga: enquanto a janela
-   * não virar, ainda dá tempo de fazer. */
+   * COLETIVAS não têm cota nenhuma. Quem define o ritmo delas é o
+   * responsável, que autoriza (ou não) cada pedido — então, assim que uma é
+   * confirmada, ela volta pra lista com "Quero fazer", sem esperar o dia ou
+   * a semana virar. O único momento em que ela some da lista é enquanto um
+   * pedido está em andamento. */
   function vagasRestantes(t: Tarefa) {
+    const eventos = eventosDaJanela(t.id, t.frequencia);
+
+    if (t.categoria === "coletiva") {
+      const emAndamento = eventos.filter((e) => EM_ANDAMENTO.includes(e.status)).length;
+      return { total: 1, ocupadas: emAndamento, vagas: emAndamento > 0 ? 0 : 1 };
+    }
+
     const total = t.frequencia === "diaria" ? t.ocorrencias_por_dia || 1 : 1;
-    const ocupadas = eventosDaJanela(t.id, t.frequencia).filter(
+    const ocupadas = eventos.filter(
       (e) => !["nao_feito", "pedido_para_refazer"].includes(e.status)
     ).length;
     return { total, ocupadas, vagas: Math.max(0, total - ocupadas) };
@@ -237,7 +252,13 @@ export default function CriancaDashboard({
             </>
           )}
 
-          {vagas === 0 && !esperando && !liberada && confirmadas > 0 && (
+          {t.categoria === "coletiva" && confirmadas > 0 && (
+            <span className="text-xs text-green-400">
+              {confirmadas === 1 ? "feita 1× ✓" : `feita ${confirmadas}× ✓`}
+            </span>
+          )}
+
+          {t.categoria !== "coletiva" && vagas === 0 && !esperando && !liberada && confirmadas > 0 && (
             <span className="text-xs text-green-400">
               {total > 1 ? "tudo feito hoje ✓" : "confirmado ✓"}
             </span>
@@ -250,11 +271,16 @@ export default function CriancaDashboard({
   function Catalogo({
     tarefas,
     agruparPor,
-    expansivel = false,
+    aba,
+    comecarAbertas = false,
   }: {
     tarefas: Tarefa[];
     agruparPor: "categoria" | "subcategoria";
-    expansivel?: boolean;
+    /** Prefixo da chave: cada aba lembra as próprias categorias abertas. */
+    aba: string;
+    /** Hoje e Esta semana começam abertas (são a lista do dia); Coletivas e
+     * o Catálogo Completo começam fechadas, porque são longas. */
+    comecarAbertas?: boolean;
   }) {
     if (tarefas.length === 0) return <p className="text-slate-400 text-sm">Nada por aqui.</p>;
 
@@ -272,37 +298,34 @@ export default function CriancaDashboard({
       entradas = entradas.sort(
         (a, b) => (ORDEM_CATEGORIA[categoriaDoTitulo(a[0])] ?? 99) - (ORDEM_CATEGORIA[categoriaDoTitulo(b[0])] ?? 99)
       );
+    } else {
+      // Coletivas: são 12 áreas fechadas na tela, então ordem alfabética
+      // pra achar rápido (a ordem do banco não diz nada pra quem olha).
+      entradas = entradas.sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
     }
 
     return (
       <>
         {entradas.map(([titulo, tarefasDoGrupo]) => {
-          const lista = (
-            <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {tarefasDoGrupo.map((t) => (
-                <TarefaRow key={t.id} t={t} />
-              ))}
-            </ul>
-          );
-
-          if (!expansivel) {
-            return (
-              <section key={titulo} className="mb-6">
-                <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
-                {lista}
-              </section>
-            );
-          }
+          const chave = `${aba}:${titulo}`;
+          // O padrão de cada aba vale até a pessoa clicar: a partir daí a
+          // escolha dela é que manda (a chave passa a existir no conjunto).
+          const alterada = secoesAbertas.has(chave);
+          const aberta = aba === "catalogo" && filtrandoCatalogo ? true : comecarAbertas ? !alterada : alterada;
 
           return (
             <SecaoExpansivel
               key={titulo}
               titulo={titulo}
               contagem={tarefasDoGrupo.length}
-              aberta={filtrandoCatalogo || secoesAbertas.has(titulo)}
-              onAlternar={() => alternarSecao(titulo)}
+              aberta={aberta}
+              onAlternar={() => alternarSecao(chave)}
             >
-              {lista}
+              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {tarefasDoGrupo.map((t) => (
+                  <TarefaRow key={t.id} t={t} />
+                ))}
+              </ul>
             </SecaoExpansivel>
           );
         })}
@@ -609,6 +632,8 @@ export default function CriancaDashboard({
                 !(t.pula_fim_de_semana && ehSextaOuSabado)
             )}
             agruparPor="categoria"
+            aba="hoje"
+            comecarAbertas
           />
         </>
       )}
@@ -619,6 +644,8 @@ export default function CriancaDashboard({
           <Catalogo
             tarefas={catalog.filter((t) => t.categoria !== "coletiva" && t.frequencia === "semanal")}
             agruparPor="categoria"
+            aba="semana"
+            comecarAbertas
           />
         </>
       )}
@@ -628,7 +655,11 @@ export default function CriancaDashboard({
           <TextoDaAba>
             Essas são tarefas que você pode fazer pela família e que vão garantir uma grana extra.
           </TextoDaAba>
-          <Catalogo tarefas={catalog.filter((t) => t.categoria === "coletiva")} agruparPor="subcategoria" />
+          <Catalogo
+            tarefas={catalog.filter((t) => t.categoria === "coletiva")}
+            agruparPor="subcategoria"
+            aba="coletivas"
+          />
         </>
       )}
 
@@ -644,7 +675,7 @@ export default function CriancaDashboard({
             mostrando={catalogoFiltrado.length}
             total={catalog.length}
           />
-          <Catalogo tarefas={catalogoFiltrado} agruparPor="categoria" expansivel />
+          <Catalogo tarefas={catalogoFiltrado} agruparPor="categoria" aba="catalogo" />
         </>
       )}
 

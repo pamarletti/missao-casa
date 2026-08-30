@@ -8,13 +8,16 @@
 -- momento em que a tarefa foi feita, então saldo e histórico ficam
 -- intactos. O total obrigatório continua exatamente R$90,00/mês por
 -- menino: nenhuma tarefa individual ou individual-coletiva é tocada aqui.
+-- Rodar duas vezes não faz mal: tudo aqui é idempotente.
 --
 -- O que muda, tudo dentro das COLETIVAS (que são bônus, sem teto):
 --   1. as três refeições viram versões "para a família" (30 min) e ganham
 --      uma irmã "para si" (15 min); o lanche segue a mesma ideia, com
 --      15 min para a família e 5 min para si;
---   2. três tarefas duplicadas são desativadas;
---   3. entram 14 tarefas novas, incluindo duas áreas que não existiam no
+--   2. "Roupas, lençóis e panos" se divide em "Roupas da família" e
+--      "Roupas de cama", e os panos de prato/chão passam para a cozinha;
+--   3. três tarefas duplicadas são desativadas;
+--   4. entram 14 tarefas novas, incluindo duas áreas que não existiam no
 --      app: Área externa (quintal e jardim) e Pets.
 
 -- 1. Renomeações: mesma linha, mesmo id, o histórico continua ligado.
@@ -34,8 +37,24 @@ update public.task_catalog set tempo_min = 30, nivel = 3, valor_unitario = 2.80 
 update public.task_catalog set tempo_min = 30, nivel = 3, valor_unitario = 2.80 where name = 'Fazer jantar para a família';
 update public.task_catalog set tempo_min = 15, nivel = 2, valor_unitario = 1.25 where name = 'Preparar lanche para a família';
 
--- 3. "Organizar e limpar despensa" estava em Área de Serviço; na lista
---    final ela pertence a Planejamento e compras.
+-- 3. Categorias das coletivas: "Roupa da casa" / "Roupas, lençóis e panos"
+--    se divide em duas, e os panos vão para a cozinha (é lá que eles são
+--    usados). Só muda onde a tarefa aparece na tela; valor e histórico
+--    ficam iguais.
+update public.task_catalog set subcategoria = 'Limpeza da cozinha'
+where name in ('Lavar panos de prato', 'Lavar panos de chão');
+
+update public.task_catalog set subcategoria = 'Roupas de cama'
+where name in (
+  'Dobrar roupa de cama',
+  'Guardar roupa de cama',
+  'Lavar roupa de cama',
+  'Secar roupa de cama',
+  'Trocar a roupa de cama (áreas comuns)');
+
+update public.task_catalog set subcategoria = 'Roupas da família'
+where subcategoria in ('Roupa da casa', 'Roupas, lençóis e panos');
+
 update public.task_catalog
 set subcategoria = 'Planejamento e compras'
 where name = 'Organizar e limpar despensa';
@@ -128,22 +147,22 @@ as $$
     (p_family_id, 'Varrer e passar pano no chão da cozinha', 'coletiva', 'Limpeza da cozinha', 'diaria', 10, 1, 0.70, 1, false),
     (p_family_id, 'Limpar micro-ondas', 'coletiva', 'Limpeza da cozinha', 'semanal', 10, 1, 0.70, 1, false),
     (p_family_id, 'Limpar a geladeira por dentro', 'coletiva', 'Limpeza da cozinha', 'semanal', 15, 2, 1.25, 1, false),
-    (p_family_id, 'Lavar roupas brancas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),
-    (p_family_id, 'Lavar roupas coloridas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),
-    (p_family_id, 'Lavar roupas escuras', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),
-    (p_family_id, 'Secar roupas brancas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 1, 0.70, 1, false),
-    (p_family_id, 'Secar roupas coloridas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 1, 0.70, 1, false),
-    (p_family_id, 'Secar roupas escuras', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 1, 0.70, 1, false),
-    (p_family_id, 'Dobrar roupas brancas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 15, 2, 1.25, 1, false),
-    (p_family_id, 'Dobrar roupas coloridas', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 15, 2, 1.25, 1, false),
-    (p_family_id, 'Dobrar roupas escuras', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 15, 2, 1.25, 1, false),
-    (p_family_id, 'Lavar roupa de cama', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 2, 0.85, 1, false),
-    (p_family_id, 'Secar roupa de cama', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 10, 1, 0.70, 1, false),
-    (p_family_id, 'Dobrar roupa de cama', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 15, 2, 1.25, 1, false),
-    (p_family_id, 'Guardar roupa de cama', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 5, 1, 0.35, 1, false),
-    (p_family_id, 'Trocar a roupa de cama (áreas comuns)', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 15, 2, 1.25, 1, false),
-    (p_family_id, 'Lavar panos de prato', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 5, 1, 0.35, 1, false),
-    (p_family_id, 'Lavar panos de chão', 'coletiva', 'Roupas, lençóis e panos', 'semanal', 5, 1, 0.35, 1, false),
+    (p_family_id, 'Lavar roupas brancas', 'coletiva', 'Roupas da família', 'semanal', 10, 2, 0.85, 1, false),
+    (p_family_id, 'Lavar roupas coloridas', 'coletiva', 'Roupas da família', 'semanal', 10, 2, 0.85, 1, false),
+    (p_family_id, 'Lavar roupas escuras', 'coletiva', 'Roupas da família', 'semanal', 10, 2, 0.85, 1, false),
+    (p_family_id, 'Secar roupas brancas', 'coletiva', 'Roupas da família', 'semanal', 10, 1, 0.70, 1, false),
+    (p_family_id, 'Secar roupas coloridas', 'coletiva', 'Roupas da família', 'semanal', 10, 1, 0.70, 1, false),
+    (p_family_id, 'Secar roupas escuras', 'coletiva', 'Roupas da família', 'semanal', 10, 1, 0.70, 1, false),
+    (p_family_id, 'Dobrar roupas brancas', 'coletiva', 'Roupas da família', 'semanal', 15, 2, 1.25, 1, false),
+    (p_family_id, 'Dobrar roupas coloridas', 'coletiva', 'Roupas da família', 'semanal', 15, 2, 1.25, 1, false),
+    (p_family_id, 'Dobrar roupas escuras', 'coletiva', 'Roupas da família', 'semanal', 15, 2, 1.25, 1, false),
+    (p_family_id, 'Lavar roupa de cama', 'coletiva', 'Roupas de cama', 'semanal', 10, 2, 0.85, 1, false),
+    (p_family_id, 'Secar roupa de cama', 'coletiva', 'Roupas de cama', 'semanal', 10, 1, 0.70, 1, false),
+    (p_family_id, 'Dobrar roupa de cama', 'coletiva', 'Roupas de cama', 'semanal', 15, 2, 1.25, 1, false),
+    (p_family_id, 'Guardar roupa de cama', 'coletiva', 'Roupas de cama', 'semanal', 5, 1, 0.35, 1, false),
+    (p_family_id, 'Trocar a roupa de cama (áreas comuns)', 'coletiva', 'Roupas de cama', 'semanal', 15, 2, 1.25, 1, false),
+    (p_family_id, 'Lavar panos de prato', 'coletiva', 'Limpeza da cozinha', 'semanal', 5, 1, 0.35, 1, false),
+    (p_family_id, 'Lavar panos de chão', 'coletiva', 'Limpeza da cozinha', 'semanal', 5, 1, 0.35, 1, false),
     (p_family_id, 'Limpar o vaso sanitário', 'coletiva', 'Banheiro', 'diaria', 5, 2, 0.40, 1, false),
     (p_family_id, 'Limpar a pia do banheiro', 'coletiva', 'Banheiro', 'diaria', 3, 1, 0.20, 1, false),
     (p_family_id, 'Varrer e passar pano no chão do banheiro', 'coletiva', 'Banheiro', 'diaria', 5, 1, 0.35, 1, false),

@@ -142,6 +142,7 @@ export default function PendenciasTab({
 
     const total = vezesDe(t, profileId);
     const ocupadas = doFilho.filter((e) => !AINDA_DA_TEMPO.includes(e.status)).length;
+    const emAberto = doFilho.filter((e) => AINDA_DA_TEMPO.includes(e.status));
 
     return {
       total,
@@ -149,8 +150,11 @@ export default function PendenciasTab({
       vagas: Math.max(0, total - ocupadas),
       /** Marcação do menino esperando a decisão do responsável. */
       esperando: doFilho.find((e) => ESPERANDO_DECISAO.includes(e.status)),
-      /** Já foi marcada como não feita / pra refazer nesta janela. */
-      naoFeito: doFilho.some((e) => AINDA_DA_TEMPO.includes(e.status)),
+      /** As duas situações em que ainda dá tempo são diferentes na tela: o
+       * menino nem fez ("não feito"), ou fez e você mandou fazer de novo
+       * ("está refazendo"). Vale o último dos dois que aconteceu. */
+      naoFeito: emAberto[emAberto.length - 1]?.status === "nao_feito",
+      refazendo: emAberto[emAberto.length - 1]?.status === "pedido_para_refazer",
       ultimo: doFilho[doFilho.length - 1],
     };
   }
@@ -200,7 +204,17 @@ export default function PendenciasTab({
                 </div>
                 <ul className="divide-y divide-slate-700/60">
                   {porFilho.map(({ crianca, situacao }) => {
-                    const { total, ocupadas, vagas, esperando, naoFeito, ultimo } = situacao;
+                    const { total, ocupadas, vagas, esperando, naoFeito, refazendo, ultimo } = situacao;
+                    // Enquanto está refazendo, os botões mudam de tom: é a
+                    // mesma decisão de sempre (✓ feito, ✗ não feito), mas
+                    // sobre uma segunda tentativa — e dá pra ver isso de
+                    // relance, sem ler o texto ao lado.
+                    const classeFeito = refazendo
+                      ? "btn bg-amber-300 text-slate-900 hover:bg-amber-200 text-xs px-2 py-0.5"
+                      : "btn-primary text-xs px-2 py-0.5";
+                    const classeNaoFeito = refazendo
+                      ? "btn bg-red-400 text-slate-900 hover:bg-red-300 text-xs px-2 py-0.5"
+                      : "btn-danger text-xs px-2 py-0.5";
                     return (
                       <li
                         key={crianca.id}
@@ -256,14 +270,15 @@ export default function PendenciasTab({
                           </div>
                         ) : vagas > 0 ? (
                           <div className="flex items-center gap-1.5">
+                            {refazendo && <span className="text-xs text-sky-400 mr-1">está refazendo</span>}
                             {naoFeito && <span className="text-xs text-amber-400 mr-1">não feito</span>}
                             <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "feito")}>
-                              <BotaoAcao className="btn-primary text-xs px-2 py-0.5" title="Marcar feito">
+                              <BotaoAcao className={classeFeito} title="Marcar feito">
                                 ✓
                               </BotaoAcao>
                             </form>
                             <form action={registrarDireto.bind(null, tarefa.id, crianca.id, familyId, "nao_feito")}>
-                              <BotaoAcao className="btn-danger text-xs px-2 py-0.5" title="Marcar não feito">
+                              <BotaoAcao className={classeNaoFeito} title="Marcar não feito">
                                 ✗
                               </BotaoAcao>
                             </form>

@@ -13,7 +13,7 @@ export default function SignupPage({
       <div className="card w-full max-w-sm space-y-4">
         <h1 className="text-2xl font-bold text-center">Criar conta da família</h1>
         <p className="text-slate-400 text-sm text-center">
-          Só o responsável faz este cadastro, uma vez. André, Hugo e o resto
+          Só o responsável faz este cadastro, uma vez. As crianças e o resto
           da família entram depois escolhendo o próprio perfil dentro do app —
           sem precisar de e-mail próprio.
         </p>
@@ -23,7 +23,7 @@ export default function SignupPage({
         )}
 
         <form action={signup} className="space-y-3">
-          <input name="familyName" placeholder="Nome da família (ex.: Família Marletti)" required />
+          <input name="familyName" placeholder="Nome da família (ex.: Família Silva)" required />
           <input type="email" name="email" placeholder="Seu e-mail" required />
           <input type="password" name="password" placeholder="Crie uma senha" minLength={6} required />
           <BotaoAcao className="btn-primary w-full" carregando="criando conta…">

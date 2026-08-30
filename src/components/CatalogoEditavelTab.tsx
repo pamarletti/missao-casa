@@ -94,6 +94,11 @@ function ItemEditavel({
   // Pra devolver o cursor ao campo depois do "Entendi" — senão a pessoa
   // clica no valor, lê o aviso, fecha e descobre que precisa clicar de novo.
   const campoValorRef = useRef<HTMLInputElement>(null);
+  // Trocar obrigatória <-> bônus mexe em muita coisa de uma vez (listas das
+  // crianças, cobrança, valor base), então o campo avisa na hora da troca.
+  const [tipo, setTipo] = useState(tipoDa(t));
+  const virouBonus = tipo === "Facultativa" && tipoDa(t) === "Obrigatória";
+  const [avisandoTipo, setAvisandoTipo] = useState(false);
   // Mexer no valor de uma tarefa de bônus não afeta o total das
   // obrigatórias, então ali o aviso seria falso.
   const ehObrigatoria = t.categoria === "individual" || t.categoria === "individual_coletiva";
@@ -110,6 +115,7 @@ function ItemEditavel({
           onClick={() => {
             setFinalidade(t.finalidade ?? "Para mim");
             setModoFrequencia(modoDe(t));
+            setTipo(tipoDa(t));
             setJaAvisou(false);
             setEditando(true);
           }}
@@ -178,12 +184,55 @@ function ItemEditavel({
           <CampoCategoria
             nome="tipo"
             rotulo="Tipo"
-            valor={tipoDa(t)}
+            valor={tipo}
+            onChange={(v) => {
+              setTipo(v);
+              // Só avisa na troca de verdade: voltar pro tipo original é
+              // desfazer, não precisa de aviso nenhum.
+              if (v !== tipoDa(t)) setAvisandoTipo(true);
+            }}
             opcoes={[
               { value: "Obrigatória", label: "Obrigatória" },
               { value: "Facultativa", label: "Bônus" },
             ]}
           />
+
+          {avisandoTipo && (
+            <JanelaAviso
+              titulo={virouBonus ? "De obrigatória para bônus" : "De bônus para obrigatória"}
+              onFechar={() => setAvisandoTipo(false)}
+            >
+              {virouBonus ? (
+                <>
+                  <p className="text-sm text-slate-300">
+                    A tarefa sai das listas de obrigatórias das crianças e passa a aparecer só em Bônus, onde é
+                    feita por quem quiser — e cada vez precisa da sua autorização.
+                  </p>
+                  <p className="text-sm text-slate-300">
+                    Ela também deixa de ser cobrada: não entra mais em atrasadas, não conta no &ldquo;valor em
+                    risco&rdquo; e não pode virar desconto.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-300">
+                    A tarefa passa a aparecer nas listas de obrigatórias das crianças, com prazo — e deixa de
+                    precisar da sua autorização a cada vez.
+                  </p>
+                  <p className="text-sm text-slate-300">
+                    Ela também passa a ser cobrada: se o prazo terminar sem desfecho, entra em atrasadas e pode
+                    virar desconto no saldo.
+                  </p>
+                </>
+              )}
+              <p className="text-sm text-slate-300">
+                E o valor dela {virouBonus ? "sai da" : "entra na"} soma das tarefas obrigatórias, então o valor
+                base usado no cálculo vai {virouBonus ? "baixar" : "subir"}. Para voltar ao valor base de antes,
+                use &ldquo;Mudar valor base&rdquo; depois de salvar — mas atenção: isso recalcula automaticamente
+                o valor de todas as tarefas obrigatórias.
+              </p>
+            </JanelaAviso>
+          )}
           <CampoCategoria
             nome=""
             rotulo="Frequência"

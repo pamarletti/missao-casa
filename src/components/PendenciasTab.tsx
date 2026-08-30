@@ -158,7 +158,15 @@ export default function PendenciasTab({
                         key={crianca.id}
                         className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
                       >
-                        <span className="text-sm">
+                        {/* Nome em âmbar quando a bola está com o responsável:
+                            a criança já marcou e está esperando o ✓ dele. É o
+                            que separa, de relance, "ainda não fez" de "fez e
+                            está esperando você conferir". */}
+                        <span
+                          className={
+                            "text-sm " + (esperando ? "text-amber-400 font-semibold" : "")
+                          }
+                        >
                           {crianca.name}
                           {total > 1 && (
                             <span className="text-xs text-slate-500 ml-1">

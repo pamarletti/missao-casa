@@ -244,22 +244,48 @@ export default async function Dashboard({
       .in("task_id", obrigatoriasIds.length > 0 ? obrigatoriasIds : ["00000000-0000-0000-0000-000000000000"]);
     if (eventosRecentesError) console.error("Erro ao buscar eventos recentes:", eventosRecentesError.message);
 
-    // Desfechos: uma tarefa com um destes já foi resolvida e sai da lista.
-    const DESFECHOS = ["confirmado", "desconto_automatico", "desconsiderada"];
+    // Desfechos que fecham a conta: creditaram ou descontaram de verdade.
+    const DESFECHOS = ["confirmado", "desconto_automatico"];
 
     // Agrupa por período: o dia, nas diárias; a segunda-feira, nas semanais.
+    // "Desconsiderada" fica numa conta à parte: ela também resolve a
+    // pendência, mas sem mexer no saldo — e continua aparecendo na lista,
+    // marcada, pra ficar registrado o que foi tirado do cálculo de
+    // propósito (dia de viagem, doença) em vez de simplesmente sumir.
     const resolvidas = new Map<string, number>();
+    const desconsideradas = new Map<string, number>();
     const emAberto = new Map<string, string[]>();
     for (const e of eventosRecentesRaw ?? []) {
       const tarefa = obrigatoriasCatalogo.find((t) => t.id === e.task_id);
       if (!tarefa) continue;
       const periodo = tarefa.frequencia === "semanal" ? inicioDaSemana(e.data) : e.data;
       const chave = `${e.profile_id}|${e.task_id}|${periodo}`;
-      if (DESFECHOS.includes(e.status)) {
+      if (e.status === "desconsiderada") {
+        desconsideradas.set(chave, (desconsideradas.get(chave) ?? 0) + 1);
+      } else if (DESFECHOS.includes(e.status)) {
         resolvidas.set(chave, (resolvidas.get(chave) ?? 0) + 1);
       } else {
         emAberto.set(chave, [...(emAberto.get(chave) ?? []), e.status]);
       }
+    }
+
+    /** Monta o item da lista, ou devolve null quando não há nada a mostrar.
+     * Sobrou vez por decidir? Vai com os três botões. Não sobrou, mas houve
+     * desconsideração? Vai só com a marca de "desconsiderado". */
+    function montarAtrasada(
+      chave: string,
+      base: { data: string; taskId: string; profileId: string; frequencia: string },
+      devidas: number
+    ): Atrasada | null {
+      const ignoradas = desconsideradas.get(chave) ?? 0;
+      const pendentes = devidas - (resolvidas.get(chave) ?? 0) - ignoradas;
+      if (pendentes > 0) {
+        return { ...base, pendentes, devidas, motivo: motivoDoAtraso(chave) };
+      }
+      if (ignoradas > 0) {
+        return { ...base, pendentes: 0, devidas, motivo: "desconsiderada" };
+      }
+      return null;
     }
 
     /** Por que a tarefa está na lista — vira um rótulo na tela, pra o
@@ -291,17 +317,12 @@ export default async function Dashboard({
           const devidas = vezesNoPeriodo(tarefa, crianca.id, idsDasCriancas, dia, inicioDaSemana, trocasAceitas);
           if (devidas <= 0) continue;
           const chave = `${crianca.id}|${tarefa.id}|${dia}`;
-          const pendentes = devidas - (resolvidas.get(chave) ?? 0);
-          if (pendentes <= 0) continue;
-          atrasadas.push({
-            data: dia,
-            taskId: tarefa.id,
-            profileId: crianca.id,
-            frequencia: "diaria",
-            pendentes,
-            devidas,
-            motivo: motivoDoAtraso(chave),
-          });
+          const item = montarAtrasada(
+            chave,
+            { data: dia, taskId: tarefa.id, profileId: crianca.id, frequencia: "diaria" },
+            devidas
+          );
+          if (item) atrasadas.push(item);
         }
       }
 
@@ -319,17 +340,12 @@ export default async function Dashboard({
           const devidas = vezesNoPeriodo(tarefa, crianca.id, idsDasCriancas, semana, inicioDaSemana, trocasAceitas);
           if (devidas <= 0) continue;
           const chave = `${crianca.id}|${tarefa.id}|${semana}`;
-          const pendentes = devidas - (resolvidas.get(chave) ?? 0);
-          if (pendentes <= 0) continue;
-          atrasadas.push({
-            data: semana,
-            taskId: tarefa.id,
-            profileId: crianca.id,
-            frequencia: "semanal",
-            pendentes,
-            devidas,
-            motivo: motivoDoAtraso(chave),
-          });
+          const item = montarAtrasada(
+            chave,
+            { data: semana, taskId: tarefa.id, profileId: crianca.id, frequencia: "semanal" },
+            devidas
+          );
+          if (item) atrasadas.push(item);
         }
       }
     }

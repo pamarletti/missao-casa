@@ -37,14 +37,17 @@ export type Atrasada = {
   pendentes: number;
   /** Quantas vezes eram devidas no total (3, numa tarefa de 3× por dia). */
   devidas: number;
-  /** Por que caiu na lista — vira o rótulo mostrado ao lado da tarefa. */
-  motivo: "sem_marcacao" | "aguardando" | "nao_feito";
+  /** Por que caiu na lista — vira o rótulo mostrado ao lado da tarefa.
+   * "desconsiderada" é a única que já está resolvida: fica na lista só como
+   * registro de que foi tirada do cálculo de propósito. */
+  motivo: "sem_marcacao" | "aguardando" | "nao_feito" | "desconsiderada";
 };
 
 const MOTIVO_LABEL: Record<Atrasada["motivo"], string | null> = {
   sem_marcacao: null,
   aguardando: "marcou e ficou sem sua confirmação",
   nao_feito: "ficou como não feita e o prazo passou",
+  desconsiderada: null,
 };
 
 /** Status em que a bola está com o responsável: a tarefa continua na lista
@@ -368,7 +371,7 @@ export default function PendenciasTab({
                           <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
                           <p className="text-xs text-slate-400">
                             {crianca?.name ?? "—"} · R$ {reais(Number(tarefa?.valor_unitario ?? 0))}
-                            {a.devidas > 1 && (
+                            {a.devidas > 1 && a.motivo !== "desconsiderada" && (
                               <span className="text-slate-500">
                                 {" "}
                                 · faltam {a.pendentes} de {a.devidas}
@@ -380,6 +383,9 @@ export default function PendenciasTab({
                           )}
                         </div>
                       </div>
+                      {a.motivo === "desconsiderada" ? (
+                        <span className="text-xs text-slate-400 sm:shrink-0">desconsiderado</span>
+                      ) : (
                       <div className="flex flex-col gap-2 sm:flex-row sm:gap-1.5 sm:shrink-0">
                         <form
                           action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "feito", a.pendentes)}
@@ -412,6 +418,7 @@ export default function PendenciasTab({
                           </BotaoAcao>
                         </form>
                       </div>
+                      )}
                     </li>
                   );
                 })}

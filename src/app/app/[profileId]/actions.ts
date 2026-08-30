@@ -11,6 +11,7 @@ import {
   escalarParaTotalMensal,
 } from "@/lib/valorBase";
 import { inicioDaJanela, inicioDaSemana, hojeEmRecife } from "@/lib/periodos";
+import { paraNumero } from "@/lib/moeda";
 import {
   vezesNoPeriodo,
   vezesNoPeriodoSemRodizio,
@@ -524,7 +525,7 @@ export async function editarTarefa(formData: FormData) {
 
   const taskId = String(formData.get("taskId") || "");
   const name = String(formData.get("name") || "").trim();
-  const valorInformado = Number(String(formData.get("valor_unitario") || "0").replace(",", "."));
+  const valorInformado = paraNumero(formData.get("valor_unitario"));
   const icone = String(formData.get("icone") || "").trim() || null;
 
   if (!taskId || !name || !Number.isFinite(valorInformado) || valorInformado < 0) {
@@ -614,7 +615,7 @@ export async function definirValorBase(formData: FormData) {
   if (active.kind !== "responsavel") return;
 
   const familyId = String(formData.get("familyId") || "");
-  const novoValor = Number(String(formData.get("valorBase") || "0").replace(",", "."));
+  const novoValor = paraNumero(formData.get("valorBase"));
 
   if (!familyId || !Number.isFinite(novoValor) || novoValor <= 0) {
     revalidatePath(`/app/${active.profileId}`);
@@ -696,7 +697,7 @@ export async function ajustarSaldo(formData: FormData) {
   const profileId = String(formData.get("profileId") || "");
   const familyId = String(formData.get("familyId") || "");
   const tipo = String(formData.get("tipo") || "adicionar");
-  const valorInformado = Number(String(formData.get("valor") || "0").replace(",", "."));
+  const valorInformado = paraNumero(formData.get("valor"));
   const motivo = String(formData.get("motivo") || "").trim() || null;
 
   if (!profileId || !familyId || !Number.isFinite(valorInformado) || valorInformado <= 0) {

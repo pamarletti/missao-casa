@@ -2,6 +2,7 @@
 
 import { desfazerEvento, desfazerAjuste } from "@/app/app/[profileId]/actions";
 import { BotaoDireto } from "@/components/Carregando";
+import { reais } from "@/lib/moeda";
 
 export type AtividadeItem = {
   id: string;
@@ -36,7 +37,7 @@ export default function Atividades({
             <p className="font-medium">{item.descricao}</p>
             <p className="text-sm text-slate-400">
               {item.quemNome ? `${item.quemNome} · ` : ""}
-              {new Date(item.quando).toLocaleDateString("pt-BR")} · R$ {Number(item.valor).toFixed(2)} ·{" "}
+              {new Date(item.quando).toLocaleDateString("pt-BR")} · R$ {reais(Number(item.valor))} ·{" "}
               {item.statusLabel}
             </p>
           </div>

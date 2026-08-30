@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { reais } from "@/lib/moeda";
 
 /** Somatório do que as tarefas renderam para o menino, em quatro janelas de
  * tempo. Conta só tarefas (obrigatórias e coletivas), não ajustes manuais
@@ -47,7 +48,7 @@ export default function TotaisAtividadesCard({ totais }: { totais: TotaisAtivida
       </div>
 
       <p className={"text-3xl font-bold " + (valor < 0 ? "text-red-400" : "text-casa-accent")}>
-        R$ {valor.toFixed(2)}
+        R$ {reais(valor)}
       </p>
       <p className="text-sm text-slate-400">
         somando tudo que você fez {escolhido.legenda} (tarefas obrigatórias e coletivas)

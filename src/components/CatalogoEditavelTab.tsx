@@ -8,6 +8,7 @@ import ListaAgrupada from "@/components/ListaAgrupada";
 import { tipoDa } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
+import { reais, paraCampo } from "@/lib/moeda";
 
 type Tarefa = {
   id: string;
@@ -91,7 +92,7 @@ function ItemEditavel({
       <li className="card p-3 flex flex-col items-center text-center gap-1">
         <span className="text-2xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
-        <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
+        <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
         <button
           type="button"
           className="text-xs text-slate-500 underline mt-1"
@@ -120,7 +121,7 @@ function ItemEditavel({
         <input name="name" defaultValue={t.name} className="text-sm" placeholder="Nome" required />
         <input
           name="valor_unitario"
-          defaultValue={t.valor_unitario}
+          defaultValue={paraCampo(t.valor_unitario)}
           className="text-sm"
           placeholder="Valor"
           inputMode="decimal"
@@ -242,7 +243,7 @@ function ItemDesnecessario({ t }: { t: Tarefa }) {
     <li className="card p-3 flex flex-col items-center text-center gap-1 opacity-60">
       <span className="text-2xl grayscale">{iconeTarefa(t)}</span>
       <p className="font-medium text-sm leading-tight">{t.name}</p>
-      <p className="text-xs text-slate-400">R$ {Number(t.valor_unitario).toFixed(2)}</p>
+      <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
       <BotaoDireto
         className="text-xs text-casa-accent underline mt-1 disabled:opacity-40"
         title="Voltar a usar esta tarefa"
@@ -297,7 +298,7 @@ function ValorBaseCard({
         <div>
           <p className="text-slate-400 text-sm">Valor aproximado para cálculo das tarefas obrigatórias:</p>
           <p className="text-2xl font-bold text-casa-accent flex items-center gap-2">
-            R$ {totalAtual.toFixed(2)}
+            R$ {reais(totalAtual)}
             <button
               type="button"
               onClick={() => setExplicando((v) => !v)}
@@ -311,7 +312,7 @@ function ValorBaseCard({
           </p>
           {saiuDoAlvo ? (
             <p className="text-xs text-amber-400 mt-1">
-              Você saiu do seu alvo de R$ {registrado.toFixed(2)} — está R$ {Math.abs(distancia).toFixed(2)}{" "}
+              Você saiu do seu alvo de R$ {reais(registrado)} — está R$ {reais(Math.abs(distancia))}{" "}
               {distancia > 0 ? "acima" : "abaixo"}, porque você alterou diretamente o valor de alguma(s)
               tarefa(s). Se quiser voltar ao valor base original, mude manualmente. Aviso: se fizer isso, o valor
               das tarefas será automaticamente recalculado.
@@ -319,7 +320,7 @@ function ValorBaseCard({
           ) : (
             diferente && (
               <p className="text-xs text-slate-500 mt-1">
-                (valor base registrado: R$ {registrado.toFixed(2)})
+                (valor base registrado: R$ {reais(registrado)})
               </p>
             )
           )}
@@ -368,7 +369,7 @@ function ValorBaseCard({
           </p>
           <input
             name="valorBase"
-            defaultValue={totalAtual.toFixed(2)}
+            defaultValue={paraCampo(totalAtual)}
             inputMode="decimal"
             placeholder="Novo valor base (R$)"
             required

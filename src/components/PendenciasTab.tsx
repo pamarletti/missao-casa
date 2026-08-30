@@ -5,6 +5,7 @@ import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
+import { reais } from "@/lib/moeda";
 
 type Tarefa = {
   id: string;
@@ -165,7 +166,7 @@ export default function PendenciasTab({
                   <span className="text-xl">{iconeTarefa(tarefa)}</span>
                   <p className="font-medium">{tarefa.name}</p>
                   <span className="text-xs text-slate-400 ml-auto">
-                    R$ {Number(tarefa.valor_unitario).toFixed(2)}
+                    R$ {reais(Number(tarefa.valor_unitario))}
                   </span>
                 </div>
                 <ul className="divide-y divide-slate-700/60">
@@ -318,7 +319,7 @@ export default function PendenciasTab({
                         <div>
                           <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
                           <p className="text-xs text-slate-400">
-                            {crianca?.name ?? "—"} · R$ {Number(tarefa?.valor_unitario ?? 0).toFixed(2)}
+                            {crianca?.name ?? "—"} · R$ {reais(Number(tarefa?.valor_unitario ?? 0))}
                             {a.devidas > 1 && (
                               <span className="text-slate-500">
                                 {" "}

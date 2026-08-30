@@ -2,6 +2,7 @@
 
 import { decidir, desfazerEvento } from "@/app/app/[profileId]/actions";
 import { BotaoDireto } from "@/components/Carregando";
+import { reais } from "@/lib/moeda";
 
 type Item = { id: string; data: string; status: string; valor: number; profileName: string; descricao: string };
 
@@ -31,7 +32,7 @@ export default function RevisarTarefasTab({ eventos, count }: { eventos: Item[];
                 <p className="font-medium">{e.descricao}</p>
                 <p className="text-sm text-slate-400">
                   {e.profileName} · {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR")} · R${" "}
-                  {Number(e.valor).toFixed(2)} · {STATUS_LABEL[e.status] ?? e.status}
+                  {reais(Number(e.valor))} · {STATUS_LABEL[e.status] ?? e.status}
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:shrink-0">

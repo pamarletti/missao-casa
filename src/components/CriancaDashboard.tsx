@@ -22,6 +22,7 @@ import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansi
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
 import AtualizacaoAoVivo from "@/components/AtualizacaoAoVivo";
 import { vezesNoPeriodo, pedidosVigentes, type PedidoDeTroca } from "@/lib/trocas";
+import { reais } from "@/lib/moeda";
 
 // Recife não observa horário de verão: UTC-3 o ano todo (mesma lógica da
 // rotina de desconto automático em src/app/api/cron/desconto/route.ts).
@@ -327,7 +328,7 @@ export default function CriancaDashboard({
         <span className="text-3xl">{iconeTarefa(t)}</span>
         <p className="font-medium text-sm leading-tight">{t.name}</p>
         <p className="text-xs text-slate-400">
-          R$ {Number(t.valor_unitario).toFixed(2)}
+          R$ {reais(Number(t.valor_unitario))}
           {(t.ocorrencias_por_dia || 1) > 1 && (
             <span className="text-slate-500"> · {t.ocorrencias_por_dia}× por dia</span>
           )}
@@ -612,16 +613,16 @@ export default function CriancaDashboard({
         <>
           <div className="card mb-4">
             <p className="text-slate-400 text-sm">Saldo disponível para {nome}</p>
-            <p className="text-3xl font-bold text-casa-accent">R$ {saldoAtual.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-casa-accent">R$ {reais(saldoAtual)}</p>
 
             <div className="flex justify-between text-center mt-3 pt-3 border-t border-slate-700">
               <div>
                 <p className="text-xs text-slate-400">Ganhos</p>
-                <p className="font-semibold text-green-400">R$ {ganhosAtual.toFixed(2)}</p>
+                <p className="font-semibold text-green-400">R$ {reais(ganhosAtual)}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-400">Descontos</p>
-                <p className="font-semibold text-red-400">-R$ {descontosAtual.toFixed(2)}</p>
+                <p className="font-semibold text-red-400">-R$ {reais(descontosAtual)}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-400">Desde o início em</p>
@@ -653,7 +654,7 @@ export default function CriancaDashboard({
               </div>
               {valorEmRiscoHoje > 0 ? (
                 <p className="text-sm font-bold text-red-400 text-right shrink-0">
-                  -R$ {valorEmRiscoHoje.toFixed(2)}
+                  -R$ {reais(valorEmRiscoHoje)}
                 </p>
               ) : (
                 <p className="text-sm text-green-400 text-right shrink-0">tudo em dia ✓</p>
@@ -667,7 +668,7 @@ export default function CriancaDashboard({
               </div>
               {valorEmRiscoSemana > 0 ? (
                 <p className="text-sm font-bold text-red-400 text-right shrink-0">
-                  -R$ {valorEmRiscoSemana.toFixed(2)}
+                  -R$ {reais(valorEmRiscoSemana)}
                 </p>
               ) : (
                 <p className="text-sm text-green-400 text-right shrink-0">tudo em dia ✓</p>
@@ -685,7 +686,7 @@ export default function CriancaDashboard({
             <div className="flex justify-between text-sm text-slate-400 mb-1">
               <span>Progresso de hoje</span>
               <span>
-                R$ {feitoHoje.toFixed(2)} / R$ {potencialDia.toFixed(2)}
+                R$ {reais(feitoHoje)} / R$ {reais(potencialDia)}
               </span>
             </div>
             <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
@@ -700,7 +701,7 @@ export default function CriancaDashboard({
             <div className="flex justify-between text-sm text-slate-400 mb-1">
               <span>Progresso do mês</span>
               <span>
-                R$ {obrigatoriasFeitasMes.toFixed(2)} / R$ {potencialMes.toFixed(2)}
+                R$ {reais(obrigatoriasFeitasMes)} / R$ {reais(potencialMes)}
               </span>
             </div>
             <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
@@ -712,7 +713,7 @@ export default function CriancaDashboard({
             <p className="text-xs text-slate-400 mt-2">
               {metaMesBatida
                 ? "Você já garantiu o valor cheio do mês! 🎉"
-                : `Faltam R$ ${faltaMes.toFixed(2)} para completar o mês fazendo as obrigatórias.`}
+                : `Faltam R$ ${reais(faltaMes)} para completar o mês fazendo as obrigatórias.`}
             </p>
           </div>
 
@@ -731,15 +732,15 @@ export default function CriancaDashboard({
             <p className="text-sm text-slate-400 mb-2">Se fizer tudo que é obrigatório, dá pra chegar a:</p>
             <div className="flex justify-around text-center">
               <div>
-                <p className="font-bold text-casa-accent">R$ {potencialDia.toFixed(2)}</p>
+                <p className="font-bold text-casa-accent">R$ {reais(potencialDia)}</p>
                 <p className="text-xs text-slate-400">hoje</p>
               </div>
               <div>
-                <p className="font-bold text-casa-accent">R$ {potencialSemana.toFixed(2)}</p>
+                <p className="font-bold text-casa-accent">R$ {reais(potencialSemana)}</p>
                 <p className="text-xs text-slate-400">essa semana</p>
               </div>
               <div>
-                <p className="font-bold text-casa-accent">R$ {potencialMes.toFixed(2)}</p>
+                <p className="font-bold text-casa-accent">R$ {reais(potencialMes)}</p>
                 <p className="text-xs text-slate-400">esse mês</p>
               </div>
             </div>
@@ -749,15 +750,15 @@ export default function CriancaDashboard({
             <p className="text-sm text-slate-400 mb-2">Ainda dá para ganhar bônus sem limite:</p>
             <div className="flex justify-around text-center">
               <div>
-                <p className="font-bold text-green-400">R$ {bonusExtraDia.toFixed(2)}</p>
+                <p className="font-bold text-green-400">R$ {reais(bonusExtraDia)}</p>
                 <p className="text-xs text-slate-400">por dia</p>
               </div>
               <div>
-                <p className="font-bold text-green-400">R$ {bonusExtraSemana.toFixed(2)}</p>
+                <p className="font-bold text-green-400">R$ {reais(bonusExtraSemana)}</p>
                 <p className="text-xs text-slate-400">por semana</p>
               </div>
               <div>
-                <p className="font-bold text-green-400">R$ {bonusExtraMes.toFixed(2)}</p>
+                <p className="font-bold text-green-400">R$ {reais(bonusExtraMes)}</p>
                 <p className="text-xs text-slate-400">por mês</p>
               </div>
             </div>
@@ -820,7 +821,7 @@ export default function CriancaDashboard({
               <h2 className="text-lg font-semibold">Confirmações e autorizações pendentes</h2>
               {pendentesProprios.length > 0 && (
                 <span className="text-sm font-semibold text-amber-400 shrink-0">
-                  R$ {valorPendente.toFixed(2)} pendente
+                  R$ {reais(valorPendente)} pendente
                 </span>
               )}
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { reais } from "@/lib/moeda";
 
 type Item = { id: string; data: string; valor: number; profileId: string; profileName: string; descricao: string };
 
@@ -44,7 +45,7 @@ export default function DescontosPorDiaTab({ eventos, ajustes }: { eventos: Item
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm">{itens[0].profileName}</span>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-red-400">-R$ {Math.abs(total).toFixed(2)}</span>
+                        <span className="text-sm font-bold text-red-400">-R$ {reais(Math.abs(total))}</span>
                         <button
                           type="button"
                           className="text-xs text-slate-500 underline"
@@ -59,7 +60,7 @@ export default function DescontosPorDiaTab({ eventos, ajustes }: { eventos: Item
                         {itens.map((it) => (
                           <li key={it.id} className="text-xs text-slate-400 flex justify-between gap-3">
                             <span>{it.descricao}</span>
-                            <span>-R$ {Math.abs(it.valor).toFixed(2)}</span>
+                            <span>-R$ {reais(Math.abs(it.valor))}</span>
                           </li>
                         ))}
                       </ul>

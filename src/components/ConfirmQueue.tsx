@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { decidir } from "@/app/app/[profileId]/actions";
 import { BotaoDireto } from "@/components/Carregando";
+import { reais } from "@/lib/moeda";
 
 export type PendingEvent = {
   id: string;
@@ -83,7 +84,7 @@ export default function ConfirmQueue({
           <div className="min-w-0">
             <p className="font-semibold">{e.task_catalog?.name ?? "Tarefa"}</p>
             <p className="text-sm text-slate-400">
-              {e.profiles?.name} · R$ {Number(e.valor).toFixed(2)} ·{" "}
+              {e.profiles?.name} · R$ {reais(Number(e.valor))} ·{" "}
               {e.status === "aguardando_autorizacao" ? "pedindo autorização" : "aguardando confirmação"}
             </p>
           </div>

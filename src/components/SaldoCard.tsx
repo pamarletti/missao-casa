@@ -29,7 +29,7 @@ export default function SaldoCard({
           </p>
           <p className="text-2xl font-bold text-casa-accent">R$ {saldo.toFixed(2)}</p>
         </div>
-        <button className="btn-secondary text-sm shrink-0" onClick={() => setAberto((v) => !v)}>
+        <button type="button" className="btn-secondary text-sm shrink-0" onClick={() => setAberto((v) => !v)}>
           {aberto ? "cancelar" : "Ajustar saldo"}
         </button>
       </div>

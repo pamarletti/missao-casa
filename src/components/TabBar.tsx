@@ -13,6 +13,7 @@ export default function TabBar<T extends string>({
     <div className="flex gap-2 overflow-x-auto pb-3 mb-4 -mx-4 px-4">
       {tabs.map((t) => (
         <button
+          type="button"
           key={t.key}
           onClick={() => onChange(t.key)}
           className={

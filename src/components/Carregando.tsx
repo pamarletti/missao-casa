@@ -30,15 +30,85 @@ type CarregandoContexto = {
 
 const Contexto = createContext<CarregandoContexto | null>(null);
 
+function rotaAtual() {
+  return window.location.pathname + window.location.search;
+}
+
 /** Envolve o app inteiro (em src/app/layout.tsx) e desenha a faixa do topo.
  * Conta quantas ações estão em andamento ao mesmo tempo, pra faixa não
- * sumir cedo demais quando duas coisas rodam juntas. */
+ * sumir cedo demais quando duas coisas rodam juntas.
+ *
+ * Também é aqui que fica a guarda do lugar da página (ver `restaurar`
+ * abaixo): como todo botão de ação do app passa por este contador, ele é o
+ * único ponto que sabe exatamente quando uma ação começou e quando ela
+ * terminou de aparecer na tela. */
 export function CarregandoProvider({ children }: { children: ReactNode }) {
   const [emAndamento, setEmAndamento] = useState(0);
 
-  const registrar = useCallback((ativo: boolean) => {
-    setEmAndamento((n) => Math.max(0, n + (ativo ? 1 : -1)));
+  // Contador de verdade num ref, além do estado: o estado só existe pra
+  // desenhar a faixa, e a conta precisa estar certa no instante do clique,
+  // sem esperar re-render.
+  const contadorRef = useRef(0);
+  const posicaoRef = useRef<{ y: number; rota: string } | null>(null);
+
+  /** Devolve a página para onde ela estava antes da ação.
+   *
+   * Por que isso é necessário: quando uma ação de servidor termina, ela
+   * marca a página como desatualizada (`revalidatePath`) e o Next busca o
+   * conteúdo novo como se fosse uma navegação — e navegação, por padrão,
+   * começa no topo. Na prática, abrir uma lista lá no fim do catálogo ou
+   * marcar uma tarefa no meio da tela jogava a pessoa de volta pro começo
+   * da página, e ela tinha que rolar tudo de novo pra continuar de onde
+   * parou.
+   *
+   * Fica de olho por meio segundo depois que a ação termina (o pulo pro
+   * topo às vezes acontece um instante depois) e só age se realmente
+   * pularam. As travas, pra nunca puxar a tela de volta na hora errada:
+   *  1. Se a ação levou pra OUTRA página (trocar perfil, sair, mudar PIN),
+   *     o topo é o certo mesmo — não mexe.
+   *  2. Enquanto a página não estiver no topo, ninguém a moveu — não mexe.
+   *  3. Só volta quando o conteúdo novo já cresceu o bastante pra aquela
+   *     altura existir; enquanto não crescer, espera o próximo quadro.
+   *  4. Passado o meio segundo, desiste — se nada pulou, não pula mais. */
+  const restaurar = useCallback(() => {
+    const alvo = posicaoRef.current;
+    posicaoRef.current = null;
+    if (!alvo || alvo.y <= 8) return;
+
+    let quadros = 0;
+    const tentar = () => {
+      if (rotaAtual() !== alvo.rota) return;
+
+      if (window.scrollY <= 4) {
+        const alturaDisponivel = document.documentElement.scrollHeight - window.innerHeight;
+        if (alturaDisponivel >= alvo.y - 4) {
+          window.scrollTo(0, alvo.y);
+          return;
+        }
+      }
+
+      if (quadros++ < 30) requestAnimationFrame(tentar);
+    };
+    requestAnimationFrame(tentar);
   }, []);
+
+  const registrar = useCallback(
+    (ativo: boolean) => {
+      if (ativo) {
+        contadorRef.current += 1;
+        // Guarda o lugar no clique da primeira ação — ações encadeadas não
+        // sobrescrevem o ponto de partida.
+        if (contadorRef.current === 1) {
+          posicaoRef.current = { y: window.scrollY, rota: rotaAtual() };
+        }
+      } else {
+        contadorRef.current = Math.max(0, contadorRef.current - 1);
+        if (contadorRef.current === 0) restaurar();
+      }
+      setEmAndamento(contadorRef.current);
+    },
+    [restaurar]
+  );
 
   const valor = useMemo(() => ({ registrar }), [registrar]);
 

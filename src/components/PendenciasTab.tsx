@@ -22,11 +22,29 @@ type Tarefa = {
 type EventoSemana = { id: string; task_id: string; profile_id: string; status: string; data: string };
 type Crianca = { id: string; name: string };
 
-/** Uma tarefa obrigatória diária que ficou em silêncio total num dia que já
- * passou — nem o menino marcou nada, nem o responsável decidiu nada por
- * ele. Calculada no servidor (src/app/app/[profileId]/page.tsx), olhando
- * os últimos 14 dias. */
-export type Atrasada = { data: string; taskId: string; profileId: string };
+/** Uma tarefa obrigatória de um período que JÁ TERMINOU e ficou sem
+ * desfecho: sem confirmação, sem desconto e sem ter sido desconsiderada.
+ * Calculada no servidor (src/app/app/[profileId]/page.tsx), olhando os
+ * últimos 14 dias — dia a dia nas diárias, semana fechada nas semanais. */
+export type Atrasada = {
+  /** O dia, nas diárias; a segunda-feira da semana, nas semanais. */
+  data: string;
+  taskId: string;
+  profileId: string;
+  frequencia: string;
+  /** Quantas vezes ainda faltam resolver naquele período. */
+  pendentes: number;
+  /** Quantas vezes eram devidas no total (3, numa tarefa de 3× por dia). */
+  devidas: number;
+  /** Por que caiu na lista — vira o rótulo mostrado ao lado da tarefa. */
+  motivo: "sem_marcacao" | "aguardando" | "nao_feito";
+};
+
+const MOTIVO_LABEL: Record<Atrasada["motivo"], string | null> = {
+  sem_marcacao: null,
+  aguardando: "marcou e ficou sem sua confirmação",
+  nao_feito: "ficou como não feita e o prazo passou",
+};
 
 /** Status em que a bola está com o responsável: a tarefa continua na lista
  * de Pendências até ele decidir, com um botão pra resolver ali mesmo. */
@@ -247,33 +265,52 @@ export default function PendenciasTab({
       );
     }
 
-    const porDia = new Map<string, Atrasada[]>();
+    // Agrupa por período. A frequência entra na chave porque uma semanal
+    // guarda a segunda-feira como data, e ela pode coincidir com o dia de
+    // uma diária — seriam dois blocos diferentes com o mesmo cabeçalho.
+    const porPeriodo = new Map<string, Atrasada[]>();
     for (const a of atrasadas) {
-      if (!porDia.has(a.data)) porDia.set(a.data, []);
-      porDia.get(a.data)!.push(a);
+      const chave = `${a.frequencia}|${a.data}`;
+      if (!porPeriodo.has(chave)) porPeriodo.set(chave, []);
+      porPeriodo.get(chave)!.push(a);
     }
-    const dias = Array.from(porDia.keys()).sort((a, b) => (a < b ? 1 : -1));
+    const periodos = Array.from(porPeriodo.keys()).sort((a, b) => {
+      const [, dataA] = a.split("|");
+      const [, dataB] = b.split("|");
+      if (dataA !== dataB) return dataA < dataB ? 1 : -1;
+      return a < b ? 1 : -1;
+    });
+
+    const formatarData = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("pt-BR");
+    const tituloDoPeriodo = (chave: string) => {
+      const [freq, data] = chave.split("|");
+      if (freq === "semanal") {
+        return `Semana de ${formatarData(data)} a ${formatarData(
+          new Date(new Date(data + "T00:00:00Z").getTime() + 6 * 86400000).toISOString().slice(0, 10)
+        )}`;
+      }
+      return formatarData(data);
+    };
 
     return (
       <section className="mb-6">
         <h2 className="text-lg font-semibold mb-3">Atrasadas</h2>
         <p className="text-xs text-slate-500 mb-3">
-          Tarefas obrigatórias diárias que ficaram sem nenhuma marcação em dias que já passaram. Decida cada uma:
+          Tarefas obrigatórias de dias e semanas que já terminaram e ficaram sem desfecho — ninguém marcou nada, ou
+          o menino marcou e ficou esperando confirmação, ou ficou como não feita e o prazo passou. Decida cada uma:
           marque como feita, como não feita (desconta na hora) ou desconsidere (não mexe no saldo).
         </p>
         <ul className="space-y-4">
-          {dias.map((dia) => (
-            <li key={dia}>
-              <p className="text-sm font-semibold text-slate-400 mb-2">
-                {new Date(dia + "T00:00:00").toLocaleDateString("pt-BR")}
-              </p>
+          {periodos.map((chave) => (
+            <li key={chave}>
+              <p className="text-sm font-semibold text-slate-400 mb-2">{tituloDoPeriodo(chave)}</p>
               <ul className="space-y-2">
-                {porDia.get(dia)!.map((a) => {
+                {porPeriodo.get(chave)!.map((a) => {
                   const tarefa = catalog.find((t) => t.id === a.taskId);
                   const crianca = criancas.find((c) => c.id === a.profileId);
                   return (
                     <li
-                      key={`${a.taskId}|${a.profileId}|${a.data}`}
+                      key={`${a.frequencia}|${a.taskId}|${a.profileId}|${a.data}`}
                       className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -282,12 +319,21 @@ export default function PendenciasTab({
                           <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
                           <p className="text-xs text-slate-400">
                             {crianca?.name ?? "—"} · R$ {Number(tarefa?.valor_unitario ?? 0).toFixed(2)}
+                            {a.devidas > 1 && (
+                              <span className="text-slate-500">
+                                {" "}
+                                · faltam {a.pendentes} de {a.devidas}
+                              </span>
+                            )}
                           </p>
+                          {MOTIVO_LABEL[a.motivo] && (
+                            <p className="text-xs text-amber-400">{MOTIVO_LABEL[a.motivo]}</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 sm:flex-row sm:gap-1.5 sm:shrink-0">
                         <form
-                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "feito")}
+                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "feito", a.pendentes)}
                           className="w-full sm:w-auto"
                         >
                           <BotaoAcao className="btn-primary text-xs px-2 py-1 w-full sm:w-auto" title="Marcar feito">
@@ -295,7 +341,7 @@ export default function PendenciasTab({
                           </BotaoAcao>
                         </form>
                         <form
-                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "nao_feito")}
+                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "nao_feito", a.pendentes)}
                           className="w-full sm:w-auto"
                         >
                           <BotaoAcao
@@ -306,7 +352,7 @@ export default function PendenciasTab({
                           </BotaoAcao>
                         </form>
                         <form
-                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "desconsiderar")}
+                          action={registrarAtrasada.bind(null, a.taskId, a.profileId, familyId, a.data, "desconsiderar", a.pendentes)}
                           className="w-full sm:w-auto"
                         >
                           <BotaoAcao

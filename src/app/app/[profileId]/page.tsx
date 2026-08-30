@@ -202,48 +202,134 @@ export default async function Dashboard({
       resumo.total += 1;
     }
 
-    // "Atrasadas": tarefas obrigatórias DIÁRIAS que ficaram em silêncio total
-    // em algum dia que já passou (nem o menino marcou nada, nem o
-    // responsável decidiu nada) — substitui o desconto automático por
-    // silêncio, que não estava rodando de forma confiável no plano
-    // gratuito da Vercel. Agora é sempre uma decisão manual do responsável,
-    // dia a dia, tarefa a tarefa (ver registrarAtrasada em actions.ts).
-    // Olha só os últimos 14 dias (e nunca antes da criação do perfil do
-    // menino) pra não acumular uma lista enorme de coisas muito antigas.
+    // ── "Atrasadas" ────────────────────────────────────────────────
+    //
+    // Toda tarefa obrigatória de um período que JÁ TERMINOU e que não teve
+    // um desfecho: nem foi confirmada, nem foi descontada, nem foi
+    // desconsiderada. Cobre os três jeitos de uma tarefa ficar pelo
+    // caminho:
+    //
+    //  1. Silêncio total — ninguém marcou nada.
+    //  2. O menino marcou, mas o responsável nunca confirmou (o pedido
+    //     ficou parado em "aguardando confirmação" e o dia virou).
+    //  3. Foi marcada como "não feita" ou "pedido para refazer" enquanto
+    //     ainda dava tempo, e o tempo acabou sem ninguém voltar nela.
+    //
+    // Também conta VEZES, não só presença: numa tarefa de 3× por dia com
+    // uma confirmada, sobram duas. E vale para as semanais, olhando semanas
+    // fechadas, não só para as diárias.
+    //
+    // Não existe rotina agendada por trás disso: a lista é recalculada toda
+    // vez que o painel do responsável abre. É de propósito — o desconto
+    // automático por cron da Vercel nunca chegou a rodar de fato no plano
+    // gratuito, e uma conta feita na hora não tem como "deixar de rodar".
+    //
+    // Janela de 14 dias, e nunca antes da criação do perfil do menino, pra
+    // não acumular uma lista enorme de coisas muito antigas.
     const diariasObrigatorias = obrigatoriasCatalogo.filter((t) => t.frequencia === "diaria");
+    const semanaisObrigatorias = obrigatoriasCatalogo.filter((t) => t.frequencia === "semanal");
     const inicioJanelaAtrasadas = diasAtras(today, 13);
+    // A busca começa na segunda-feira da semana em que a janela cai, e não
+    // no primeiro dia dela: uma tarefa semanal pode ter sido feita numa
+    // segunda que ficou de fora dos 14 dias, e sem esse registro ela
+    // apareceria como atrasada sem ter sido.
+    const inicioBuscaEventos = inicioDaSemana(inicioJanelaAtrasadas);
 
-    const { data: eventosDiariosRaw, error: eventosDiariosError } = await supabase
+    const { data: eventosRecentesRaw, error: eventosRecentesError } = await supabase
       .from("task_events")
-      .select("profile_id, task_id, data")
+      .select("profile_id, task_id, data, status")
       .eq("family_id", familyId)
-      .gte("data", inicioJanelaAtrasadas)
+      .gte("data", inicioBuscaEventos)
       .lt("data", today)
-      .in(
-        "task_id",
-        diariasObrigatorias.length > 0 ? diariasObrigatorias.map((t) => t.id) : ["00000000-0000-0000-0000-000000000000"]
-      );
-    if (eventosDiariosError) console.error("Erro ao buscar eventos diários recentes:", eventosDiariosError.message);
+      .in("task_id", obrigatoriasIds.length > 0 ? obrigatoriasIds : ["00000000-0000-0000-0000-000000000000"]);
+    if (eventosRecentesError) console.error("Erro ao buscar eventos recentes:", eventosRecentesError.message);
 
-    const jaTemRegistroDiario = new Set(
-      (eventosDiariosRaw ?? []).map((e) => `${e.profile_id}|${e.task_id}|${e.data}`)
-    );
+    // Desfechos: uma tarefa com um destes já foi resolvida e sai da lista.
+    const DESFECHOS = ["confirmado", "desconto_automatico", "desconsiderada"];
+
+    // Agrupa por período: o dia, nas diárias; a segunda-feira, nas semanais.
+    const resolvidas = new Map<string, number>();
+    const emAberto = new Map<string, string[]>();
+    for (const e of eventosRecentesRaw ?? []) {
+      const tarefa = obrigatoriasCatalogo.find((t) => t.id === e.task_id);
+      if (!tarefa) continue;
+      const periodo = tarefa.frequencia === "semanal" ? inicioDaSemana(e.data) : e.data;
+      const chave = `${e.profile_id}|${e.task_id}|${periodo}`;
+      if (DESFECHOS.includes(e.status)) {
+        resolvidas.set(chave, (resolvidas.get(chave) ?? 0) + 1);
+      } else {
+        emAberto.set(chave, [...(emAberto.get(chave) ?? []), e.status]);
+      }
+    }
+
+    /** Por que a tarefa está na lista — vira um rótulo na tela, pra o
+     * responsável saber se precisa só confirmar algo que já foi feito ou se
+     * ninguém encostou naquilo. */
+    function motivoDoAtraso(chave: string): Atrasada["motivo"] {
+      const abertos = emAberto.get(chave) ?? [];
+      if (abertos.some((st) => st === "aguardando_confirmacao" || st === "aguardando_autorizacao")) {
+        return "aguardando";
+      }
+      if (abertos.some((st) => st === "nao_feito" || st === "pedido_para_refazer")) return "nao_feito";
+      return "sem_marcacao";
+    }
 
     const atrasadas: Atrasada[] = [];
     for (const crianca of criancas ?? []) {
       const criacaoISO = dataEmRecife(new Date(crianca.created_at));
+
+      // Diárias, dia a dia.
       const inicioParaEssaCrianca = criacaoISO > inicioJanelaAtrasadas ? criacaoISO : inicioJanelaAtrasadas;
       for (let dia = inicioParaEssaCrianca; dia < today; dia = somaDiasISO(dia, 1)) {
         const diaDaSemana = diaDaSemanaISO(dia);
         const eraSextaOuSabado = diaDaSemana === 5 || diaDaSemana === 6;
         for (const tarefa of diariasObrigatorias) {
-          // Só cobra de quem era o responsável NAQUELE dia: numa
-          // compartilhada, de quem era a vez; numa troca aceita, de quem
-          // pegou a tarefa (e nunca mais de quem a passou adiante).
-          if (vezesNoPeriodo(tarefa, crianca.id, idsDasCriancas, dia, inicioDaSemana, trocasAceitas) <= 0) continue;
           if (tarefa.pula_fim_de_semana && eraSextaOuSabado) continue;
-          if (jaTemRegistroDiario.has(`${crianca.id}|${tarefa.id}|${dia}`)) continue;
-          atrasadas.push({ data: dia, taskId: tarefa.id, profileId: crianca.id });
+          // Quantas vezes era dela NAQUELE dia: numa compartilhada, só se
+          // fosse a vez dela; numa troca aceita, de quem pegou a tarefa (e
+          // nunca mais de quem passou adiante). Já vem com as vezes por dia.
+          const devidas = vezesNoPeriodo(tarefa, crianca.id, idsDasCriancas, dia, inicioDaSemana, trocasAceitas);
+          if (devidas <= 0) continue;
+          const chave = `${crianca.id}|${tarefa.id}|${dia}`;
+          const pendentes = devidas - (resolvidas.get(chave) ?? 0);
+          if (pendentes <= 0) continue;
+          atrasadas.push({
+            data: dia,
+            taskId: tarefa.id,
+            profileId: crianca.id,
+            frequencia: "diaria",
+            pendentes,
+            devidas,
+            motivo: motivoDoAtraso(chave),
+          });
+        }
+      }
+
+      // Semanais, semana fechada a semana fechada (nunca a semana corrente,
+      // que ainda está valendo).
+      const semanaAtual = inicioDaSemana(today);
+      for (
+        let semana = inicioDaSemana(inicioJanelaAtrasadas);
+        semana < semanaAtual;
+        semana = somaDiasISO(semana, 7)
+      ) {
+        // Semana que começou antes de o perfil existir não conta.
+        if (semana < criacaoISO) continue;
+        for (const tarefa of semanaisObrigatorias) {
+          const devidas = vezesNoPeriodo(tarefa, crianca.id, idsDasCriancas, semana, inicioDaSemana, trocasAceitas);
+          if (devidas <= 0) continue;
+          const chave = `${crianca.id}|${tarefa.id}|${semana}`;
+          const pendentes = devidas - (resolvidas.get(chave) ?? 0);
+          if (pendentes <= 0) continue;
+          atrasadas.push({
+            data: semana,
+            taskId: tarefa.id,
+            profileId: crianca.id,
+            frequencia: "semanal",
+            pendentes,
+            devidas,
+            motivo: motivoDoAtraso(chave),
+          });
         }
       }
     }

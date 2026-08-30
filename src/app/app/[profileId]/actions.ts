@@ -375,69 +375,103 @@ export async function registrarDireto(
   revalidatePath(`/app/${active.profileId}`);
 }
 
-/** Um responsável decide, um a um, o que fazer com uma tarefa obrigatória
- * diária que ficou em silêncio total num dia que já passou ("Atrasada" no
- * painel do responsável). Substitui o desconto automático por silêncio
- * (que rodava sozinho via Vercel Cron e não estava confiável no plano
- * gratuito — ver supabase/007_status_desconsiderada.sql): agora é sempre
- * uma decisão manual, tarefa por tarefa, com a data correta do dia
- * atrasado (não a de hoje):
+/** Soma dias a uma data ISO, sem esbarrar em fuso (tudo em UTC). */
+function somaDiasISO(dataISO: string, dias: number): string {
+  const d = new Date(dataISO + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Estados em que uma tarefa já teve desfecho — os outros continuam em
+ * aberto e reaparecem na lista de Atrasadas até alguém decidir. */
+const DESFECHOS_SQL = "(confirmado,desconto_automatico,desconsiderada)";
+
+/** O responsável resolve uma tarefa obrigatória de um período que já
+ * terminou ("Atrasada" no painel dele). Substitui o desconto automático por
+ * silêncio (que rodava sozinho via Vercel Cron e não estava confiável no
+ * plano gratuito — ver supabase/007_status_desconsiderada.sql): agora é
+ * sempre uma decisão manual, tarefa por tarefa, com a data correta do
+ * período atrasado (não a de hoje):
  * - "feito": credita o valor normalmente, como se tivesse confirmado na
  *   hora.
- * - "nao_feito": desconta o valor da tarefa (multiplicado pelas ocorrências
- *   por dia, quando houver mais de uma) — o mesmo cálculo que o desconto
- *   automático fazia.
+ * - "nao_feito": desconta o valor da tarefa, uma vez por ocorrência que
+ *   ficou pendente.
  * - "desconsiderar": não credita nem desconta (ex.: dia de viagem, doença
- *   etc.) — só tira a tarefa da lista de atrasadas. */
+ *   etc.) — só tira a tarefa da lista de atrasadas.
+ *
+ * `quantidade` é quantas ocorrências daquele período ainda estão em aberto:
+ * numa tarefa de 3× por dia com uma já confirmada, sobram duas, e a decisão
+ * vale para as duas de uma vez.
+ *
+ * Reaproveita os registros que já existem em vez de criar outros por cima —
+ * é isso que faz uma marcação que o menino deixou "aguardando confirmação"
+ * virar confirmada de verdade, em vez de virar um segundo registro para a
+ * mesma tarefa no mesmo dia. */
 export async function registrarAtrasada(
   taskId: string,
   profileId: string,
   familyId: string,
   data: string,
-  decisao: "feito" | "nao_feito" | "desconsiderar"
+  decisao: "feito" | "nao_feito" | "desconsiderar",
+  quantidade = 1
 ) {
   const active = await requireActiveProfile();
   if (active.kind !== "responsavel") return;
 
+  const vezes = Math.max(1, Math.min(12, Math.floor(quantidade)));
+
   const supabase = createClient();
   const { data: task } = await supabase
     .from("task_catalog")
-    .select("valor_unitario, ocorrencias_por_dia")
+    .select("valor_unitario, frequencia")
     .eq("id", taskId)
     .single();
   if (!task) return;
 
-  if (decisao === "feito") {
+  // Nas semanais, `data` é a segunda-feira daquela semana: um registro dela
+  // pode ter caído em qualquer dia até o domingo.
+  const fimDoPeriodo = task.frequencia === "semanal" ? somaDiasISO(data, 6) : data;
+
+  const { data: emAberto } = await supabase
+    .from("task_events")
+    .select("id")
+    .eq("task_id", taskId)
+    .eq("profile_id", profileId)
+    .gte("data", data)
+    .lte("data", fimDoPeriodo)
+    .not("status", "in", DESFECHOS_SQL)
+    .order("data", { ascending: true })
+    .limit(vezes);
+
+  const status =
+    decisao === "feito" ? "confirmado" : decisao === "nao_feito" ? "desconto_automatico" : "desconsiderada";
+  const valor =
+    decisao === "feito"
+      ? Number(task.valor_unitario)
+      : decisao === "nao_feito"
+        ? -Number(task.valor_unitario)
+        : 0;
+
+  const desfecho = {
+    status,
+    valor,
+    origem: "responsavel",
+    confirmado_por: decisao === "feito" ? active.profileId : null,
+    confirmado_em: decisao === "feito" ? new Date().toISOString() : null,
+  };
+
+  const reaproveitados = emAberto ?? [];
+  for (const evento of reaproveitados) {
+    await supabase.from("task_events").update(desfecho).eq("id", evento.id);
+  }
+
+  for (let i = reaproveitados.length; i < vezes; i++) {
     await supabase.from("task_events").insert({
       family_id: familyId,
       task_id: taskId,
       profile_id: profileId,
       data,
-      status: "confirmado",
-      valor: task.valor_unitario,
-      origem: "responsavel",
-      confirmado_por: active.profileId,
-      confirmado_em: new Date().toISOString(),
-    });
-  } else if (decisao === "nao_feito") {
-    await supabase.from("task_events").insert({
-      family_id: familyId,
-      task_id: taskId,
-      profile_id: profileId,
-      data,
-      status: "desconto_automatico",
-      valor: -(Number(task.valor_unitario) * (task.ocorrencias_por_dia || 1)),
-      origem: "responsavel",
-    });
-  } else {
-    await supabase.from("task_events").insert({
-      family_id: familyId,
-      task_id: taskId,
-      profile_id: profileId,
-      data,
-      status: "desconsiderada",
-      valor: 0,
-      origem: "responsavel",
+      ...desfecho,
     });
   }
 

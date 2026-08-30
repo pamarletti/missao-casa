@@ -1,6 +1,12 @@
 "use client";
 
-import { registrarDireto, registrarAtrasada, decidir, desfazerEvento } from "@/app/app/[profileId]/actions";
+import {
+  registrarDireto,
+  registrarAtrasada,
+  decidir,
+  desfazerEvento,
+  reconsiderarAtrasada,
+} from "@/app/app/[profileId]/actions";
 import { inicioDaJanela, inicioDaSemana } from "@/lib/periodos";
 import { iconeTarefa } from "@/lib/iconeTarefa";
 import { BotaoAcao, BotaoDireto } from "@/components/Carregando";
@@ -47,6 +53,8 @@ export type Atrasada = {
    * "desconsiderada" é a única que já está resolvida: fica na lista só como
    * registro de que foi tirada do cálculo de propósito. */
   motivo: "sem_marcacao" | "aguardando" | "nao_feito" | "desconsiderada";
+  /** Os registros de desconsideração, para poder desfazê-la ali mesmo. */
+  eventos: string[];
 };
 
 const MOTIVO_LABEL: Record<Atrasada["motivo"], string | null> = {
@@ -397,7 +405,16 @@ export default function PendenciasTab({
                         </div>
                       </div>
                       {a.motivo === "desconsiderada" ? (
-                        <span className="text-xs text-slate-400 sm:shrink-0">desconsiderado</span>
+                        <div className="flex items-center gap-2 sm:shrink-0">
+                          <span className="text-xs text-slate-400">desconsiderado</span>
+                          <BotaoDireto
+                            className="text-xs text-slate-500 underline disabled:opacity-40"
+                            title="Voltar a considerar esta tarefa"
+                            acao={() => reconsiderarAtrasada(a.eventos)}
+                          >
+                            desfazer
+                          </BotaoDireto>
+                        </div>
                       ) : (
                       <div className="flex flex-col gap-2 sm:flex-row sm:gap-1.5 sm:shrink-0">
                         <form

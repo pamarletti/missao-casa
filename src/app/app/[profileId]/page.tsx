@@ -237,7 +237,7 @@ export default async function Dashboard({
 
     const { data: eventosRecentesRaw, error: eventosRecentesError } = await supabase
       .from("task_events")
-      .select("profile_id, task_id, data, status")
+      .select("id, profile_id, task_id, data, status")
       .eq("family_id", familyId)
       .gte("data", inicioBuscaEventos)
       .lt("data", today)
@@ -253,7 +253,9 @@ export default async function Dashboard({
     // marcada, pra ficar registrado o que foi tirado do cálculo de
     // propósito (dia de viagem, doença) em vez de simplesmente sumir.
     const resolvidas = new Map<string, number>();
-    const desconsideradas = new Map<string, number>();
+    // Nas desconsideradas guardamos os ids, e não só a contagem: é o que
+    // permite desfazer a desconsideração direto da lista.
+    const desconsideradas = new Map<string, string[]>();
     const emAberto = new Map<string, string[]>();
     for (const e of eventosRecentesRaw ?? []) {
       const tarefa = obrigatoriasCatalogo.find((t) => t.id === e.task_id);
@@ -261,7 +263,7 @@ export default async function Dashboard({
       const periodo = tarefa.frequencia === "semanal" ? inicioDaSemana(e.data) : e.data;
       const chave = `${e.profile_id}|${e.task_id}|${periodo}`;
       if (e.status === "desconsiderada") {
-        desconsideradas.set(chave, (desconsideradas.get(chave) ?? 0) + 1);
+        desconsideradas.set(chave, [...(desconsideradas.get(chave) ?? []), e.id]);
       } else if (DESFECHOS.includes(e.status)) {
         resolvidas.set(chave, (resolvidas.get(chave) ?? 0) + 1);
       } else {
@@ -277,13 +279,13 @@ export default async function Dashboard({
       base: { data: string; taskId: string; profileId: string; frequencia: string },
       devidas: number
     ): Atrasada | null {
-      const ignoradas = desconsideradas.get(chave) ?? 0;
-      const pendentes = devidas - (resolvidas.get(chave) ?? 0) - ignoradas;
+      const ignoradas = desconsideradas.get(chave) ?? [];
+      const pendentes = devidas - (resolvidas.get(chave) ?? 0) - ignoradas.length;
       if (pendentes > 0) {
-        return { ...base, pendentes, devidas, motivo: motivoDoAtraso(chave) };
+        return { ...base, pendentes, devidas, motivo: motivoDoAtraso(chave), eventos: [] };
       }
-      if (ignoradas > 0) {
-        return { ...base, pendentes: 0, devidas, motivo: "desconsiderada" };
+      if (ignoradas.length > 0) {
+        return { ...base, pendentes: 0, devidas, motivo: "desconsiderada", eventos: ignoradas };
       }
       return null;
     }

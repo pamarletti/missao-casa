@@ -912,3 +912,27 @@ export async function cancelarTroca(pedidoId: string) {
 
   revalidatePath(`/app/${active.profileId}`);
 }
+
+/** Volta atrás numa desconsideração.
+ *
+ * Desconsiderar é dizer "esse dia não conta" — dia de viagem, doença, visita.
+ * Mas é uma decisão tomada às pressas, olhando uma lista, e às vezes é o
+ * item errado. Apagar os registros devolve a tarefa ao estado de antes: ela
+ * reaparece entre as atrasadas com os três botões, esperando decisão.
+ *
+ * Só apaga o que está como "desconsiderada" — a trava no status impede que
+ * um id trocado leve embora uma confirmação ou um desconto por engano. */
+export async function reconsiderarAtrasada(eventIds: string[]) {
+  const active = await requireActiveProfile();
+  if (active.kind !== "responsavel") return;
+  if (!Array.isArray(eventIds) || eventIds.length === 0) return;
+
+  const supabase = createClient();
+  await supabase
+    .from("task_events")
+    .delete()
+    .in("id", eventIds.slice(0, 24))
+    .eq("status", "desconsiderada");
+
+  revalidatePath(`/app/${active.profileId}`);
+}

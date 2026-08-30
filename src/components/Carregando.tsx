@@ -174,6 +174,7 @@ export function BotaoAcao({
   carregando,
   title,
   disabled,
+  antesDeEnviar,
 }: {
   children: ReactNode;
   className?: string;
@@ -181,12 +182,27 @@ export function BotaoAcao({
   carregando?: ReactNode;
   title?: string;
   disabled?: boolean;
+  /** Roda no clique, antes do envio. Devolvendo `false`, o envio é
+   * cancelado — é assim que um formulário abre uma janela de aviso e só
+   * envia depois, quando a própria janela chama `form.requestSubmit()`.
+   * Como `requestSubmit()` não passa por este clique, não há risco de
+   * ficar num vai-e-volta. */
+  antesDeEnviar?: () => boolean;
 }) {
   const { pending } = useFormStatus();
   useAvisarFaixa(pending);
 
   return (
-    <button type="submit" disabled={pending || disabled} className={className} title={title} aria-busy={pending}>
+    <button
+      type="submit"
+      disabled={pending || disabled}
+      className={className}
+      title={title}
+      aria-busy={pending}
+      onClick={(e) => {
+        if (antesDeEnviar && !antesDeEnviar()) e.preventDefault();
+      }}
+    >
       {pending ? (carregando ?? "…") : children}
     </button>
   );

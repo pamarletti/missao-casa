@@ -101,22 +101,22 @@ function ItemEditavel({
   // aparecer o campo de quantas vezes. No banco continua frequencia
   // "diaria" + ocorrencias_por_dia.
   const [modoFrequencia, setModoFrequencia] = useState(modoDe(t));
-  // Aviso do campo de valor: aparece na primeira vez que a pessoa encosta
-  // nele, e só uma vez por edição — repetir a cada clique viraria estorvo.
-  const [avisandoValor, setAvisandoValor] = useState(false);
-  const [jaAvisou, setJaAvisou] = useState(false);
-  // Pra devolver o cursor ao campo depois do "Entendi" — senão a pessoa
-  // clica no valor, lê o aviso, fecha e descobre que precisa clicar de novo.
-  const campoValorRef = useRef<HTMLInputElement>(null);
   // Trocar obrigatória <-> bônus mexe em muita coisa de uma vez (listas das
   // crianças, cobrança, valor base), então o campo avisa na hora da troca.
   const [tipo, setTipo] = useState(tipoDa(t));
+  const formRef = useRef<HTMLFormElement>(null);
+  const [avisandoSalvar, setAvisandoSalvar] = useState(false);
   const virouBonus = tipo === "Facultativa" && tipoDa(t) === "Obrigatória";
   const [avisandoTipo, setAvisandoTipo] = useState(false);
   const [avisandoDesnecessaria, setAvisandoDesnecessaria] = useState(false);
-  // Mexer no valor de uma tarefa de bônus não afeta o total das
-  // obrigatórias, então ali o aviso seria falso.
+  // Mexer numa tarefa de bônus não afeta o total das obrigatórias, então
+  // ali o aviso seria falso.
   const ehObrigatoria = t.categoria === "individual" || t.categoria === "individual_coletiva";
+  // Vale avisar ao salvar se a tarefa É obrigatória hoje ou se PASSA a ser
+  // com esta edição. Não é só o valor que mexe no total: frequência, vezes
+  // por dia e finalidade também mudam quantas vezes a tarefa acontece no
+  // mês, e portanto quanto ela soma.
+  const mexeNoValorBase = ehObrigatoria || tipo === "Obrigatória";
 
   if (!editando) {
     return (
@@ -131,7 +131,6 @@ function ItemEditavel({
             setFinalidade(t.finalidade ?? "Para mim");
             setModoFrequencia(modoDe(t));
             setTipo(tipoDa(t));
-            setJaAvisou(false);
             setEditando(true);
           }}
         >
@@ -144,6 +143,7 @@ function ItemEditavel({
   return (
     <li className="card p-3">
       <form
+        ref={formRef}
         action={async (formData) => {
           await editarTarefa(formData);
           setEditando(false);
@@ -153,40 +153,13 @@ function ItemEditavel({
         <input type="hidden" name="taskId" value={t.id} />
         <input name="name" defaultValue={t.name} className="text-sm" placeholder="Nome" required />
         <input
-          ref={campoValorRef}
           name="valor_unitario"
           defaultValue={paraCampo(t.valor_unitario)}
           className="text-sm"
           placeholder="Valor"
           inputMode="decimal"
           required
-          onFocus={() => {
-            if (ehObrigatoria && !jaAvisou) {
-              setJaAvisou(true);
-              setAvisandoValor(true);
-            }
-          }}
         />
-
-        {avisandoValor && (
-          <JanelaAviso
-            titulo="Isso muda o valor base"
-            onFechar={() => {
-              setAvisandoValor(false);
-              campoValorRef.current?.focus();
-            }}
-          >
-            <p className="text-sm text-slate-300">
-              Mudar o valor desta tarefa muda a soma total das tarefas obrigatórias — o valor usado como base do
-              cálculo, que é quanto cada criança pode ganhar por mês fazendo tudo.
-            </p>
-            <p className="text-sm text-slate-300">
-              Se essa soma se afastar do valor base que você registrou, um aviso aparece no card do topo desta
-              aba. Para voltar ao valor de antes, use &ldquo;Mudar valor base&rdquo; — mas atenção: isso recalcula
-              automaticamente o valor de todas as tarefas obrigatórias, inclusive esta.
-            </p>
-          </JanelaAviso>
-        )}
         <input
           name="icone"
           defaultValue={t.icone ?? ""}
@@ -315,13 +288,51 @@ function ItemEditavel({
         </div>
 
         <div className="flex gap-2">
-          <BotaoAcao className="btn-primary text-xs flex-1" carregando="salvando…">
+          <BotaoAcao
+            className="btn-primary text-xs flex-1"
+            carregando="salvando…"
+            antesDeEnviar={
+              mexeNoValorBase
+                ? () => {
+                    // Segura o envio pra mostrar o aviso. Quem envia de
+                    // verdade é o botão da janela, com requestSubmit().
+                    if (!formRef.current?.reportValidity()) return false;
+                    setAvisandoSalvar(true);
+                    return false;
+                  }
+                : undefined
+            }
+          >
             Salvar
           </BotaoAcao>
           <button type="button" className="text-xs text-slate-500 underline" onClick={() => setEditando(false)}>
             cancelar
           </button>
         </div>
+
+        {avisandoSalvar && (
+          <JanelaAviso
+            titulo="Isso muda o valor base"
+            rotuloBotao="Entendi, salvar"
+            onFechar={() => setAvisandoSalvar(false)}
+            acao={() => {
+              setAvisandoSalvar(false);
+              formRef.current?.requestSubmit();
+            }}
+          >
+            <p className="text-sm text-slate-300">
+              {ehObrigatoria
+                ? "Esta é uma tarefa obrigatória, então qualquer mudança nela — valor, frequência, quantas vezes por dia, finalidade — muda a soma total das obrigatórias."
+                : "Ao virar obrigatória, esta tarefa passa a contar na soma total das obrigatórias."}{" "}
+              Essa soma é o valor base do cálculo: quanto cada criança pode ganhar por mês fazendo tudo.
+            </p>
+            <p className="text-sm text-slate-300">
+              Se ela se afastar do valor base que você registrou, um aviso aparece no card do topo desta aba.
+              Para voltar ao valor de antes, use &ldquo;Mudar valor base&rdquo; — mas atenção: isso recalcula
+              automaticamente o valor de todas as tarefas obrigatórias, inclusive esta.
+            </p>
+          </JanelaAviso>
+        )}
       </form>
 
       <div className="mt-2 border-t border-slate-700/60 pt-2">
@@ -364,18 +375,20 @@ function ItemDesnecessario({ t }: { t: Tarefa }) {
   const ehObrigatoria = t.categoria === "individual" || t.categoria === "individual_coletiva";
 
   return (
-    <li className="card p-3 flex flex-col items-center text-center gap-1 opacity-60">
-      <span className="text-2xl grayscale">{iconeTarefa(t)}</span>
-      <p className="font-medium text-sm leading-tight">{t.name}</p>
-      <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
-      <button
-        type="button"
-        className="text-xs text-casa-accent underline mt-1"
-        title="Voltar a usar esta tarefa"
-        onClick={() => setAvisando(true)}
-      >
-        voltar a usar
-      </button>
+    <li className="card p-3">
+      <div className="flex flex-col items-center text-center gap-1 opacity-60">
+        <span className="text-2xl grayscale">{iconeTarefa(t)}</span>
+        <p className="font-medium text-sm leading-tight">{t.name}</p>
+        <p className="text-xs text-slate-400">R$ {reais(Number(t.valor_unitario))}</p>
+        <button
+          type="button"
+          className="text-xs text-casa-accent underline mt-1"
+          title="Voltar a usar esta tarefa"
+          onClick={() => setAvisando(true)}
+        >
+          voltar a usar
+        </button>
+      </div>
 
       {avisando && (
         <JanelaAviso

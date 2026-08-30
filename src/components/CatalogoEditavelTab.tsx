@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { editarTarefa, definirValorBase, marcarDesnecessaria } from "@/app/app/[profileId]/actions";
 import { iconeTarefa } from "@/lib/iconeTarefa";
-import { valorMensalTotal } from "@/lib/valorBase";
+import { valorMensalPorCrianca } from "@/lib/valorBase";
 import ListaAgrupada from "@/components/ListaAgrupada";
 import { tipoDa } from "@/lib/dimensoes";
 import SecaoExpansivel, { useSecoesExpansiveis } from "@/components/SecaoExpansivel";
@@ -260,11 +260,29 @@ function ItemDesnecessario({ t }: { t: Tarefa }) {
  * definir um novo valor base — os valores de cada tarefa são recalculados
  * proporcionalmente para que a soma bata com o novo total. Editar uma
  * tarefa individualmente (abaixo) também atualiza esse total sozinho. */
-function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string; catalog: Tarefa[]; valorBaseAtual: number }) {
+function ValorBaseCard({
+  familyId,
+  catalog,
+  valorBaseAtual,
+  numCriancas,
+}: {
+  familyId: string;
+  catalog: Tarefa[];
+  valorBaseAtual: number;
+  numCriancas: number;
+}) {
   const [aberto, setAberto] = useState(false);
   const [explicando, setExplicando] = useState(false);
   const obrigatorias = catalog.filter((t) => t.categoria === "individual" || t.categoria === "individual_coletiva");
-  const totalAtual = valorMensalTotal(obrigatorias);
+
+  // Teto de UMA criança, e não a soma bruta de todas as tarefas: nas
+  // compartilhadas os meninos se revezam, então cada um pega só a fração
+  // que cabe a ele. É exatamente a conta que definirValorBase persegue —
+  // e é o mesmo número que aparece pro menino como "dá pra chegar a" no
+  // painel dele. Enquanto essa tela usava a soma bruta, o card mostrava
+  // sempre alguns reais a mais do que o alvo pedido e acusava uma
+  // divergência que não existia.
+  const totalAtual = valorMensalPorCrianca(obrigatorias, numCriancas);
   const registrado = Number(valorBaseAtual);
   const distancia = totalAtual - registrado;
   // Alguns centavos são o arredondamento de sempre (ver o texto do "i").
@@ -294,7 +312,9 @@ function ValorBaseCard({ familyId, catalog, valorBaseAtual }: { familyId: string
           {saiuDoAlvo ? (
             <p className="text-xs text-amber-400 mt-1">
               Você saiu do seu alvo de R$ {registrado.toFixed(2)} — está R$ {Math.abs(distancia).toFixed(2)}{" "}
-              {distancia > 0 ? "acima" : "abaixo"}. Para voltar, use &ldquo;Mudar valor base&rdquo;.
+              {distancia > 0 ? "acima" : "abaixo"}, porque você alterou diretamente o valor de alguma(s)
+              tarefa(s). Se quiser voltar ao valor base original, mude manualmente. Aviso: se fizer isso, o valor
+              das tarefas será automaticamente recalculado.
             </p>
           ) : (
             diferente && (
@@ -391,7 +411,12 @@ export default function CatalogoEditavelTab({
 
   return (
     <div>
-      <ValorBaseCard familyId={familyId} catalog={ativas} valorBaseAtual={valorBaseAtual} />
+      <ValorBaseCard
+        familyId={familyId}
+        catalog={ativas}
+        valorBaseAtual={valorBaseAtual}
+        numCriancas={criancas.length > 0 ? criancas.length : 1}
+      />
 
       <ListaAgrupada
         tarefas={ativas}

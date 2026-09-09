@@ -7,7 +7,7 @@ import CriancaDashboard from "@/components/CriancaDashboard";
 import BackToTopButton from "@/components/BackToTopButton";
 import MudarPinButton from "@/components/MudarPinButton";
 import EmojiButton from "@/components/EmojiButton";
-import type { PendingEvent } from "@/components/ConfirmQueue";
+import type { PendingEvent } from "@/components/PainelInicioResponsavel";
 import type { AtividadeItem } from "@/components/Atividades";
 import { inicioDoMes, inicioDaSemana, diasAtras, hojeEmRecife, dataEmRecife } from "@/lib/periodos";
 import { valorMensalTotal } from "@/lib/valorBase";
@@ -72,7 +72,9 @@ export default async function Dashboard({
   if (profile.kind === "responsavel") {
     const { data: pending, error: pendingError } = await supabase
       .from("task_events")
-      .select("id, status, valor, data, task_catalog(name), profiles!task_events_profile_id_fkey(name)")
+      .select(
+        "id, status, valor, data, task_catalog(name, categoria, icone), profiles!task_events_profile_id_fkey(name)"
+      )
       .eq("family_id", familyId)
       .in("status", ["aguardando_autorizacao", "aguardando_confirmacao"])
       .order("created_at", { ascending: true });

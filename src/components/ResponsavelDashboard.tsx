@@ -4,7 +4,7 @@ import { useState } from "react";
 import SaldoCard from "@/components/SaldoCard";
 import NivelBadge from "@/components/NivelBadge";
 import type { NivelInfo } from "@/lib/nivelConstancia";
-import ConfirmQueue, { type PendingEvent } from "@/components/ConfirmQueue";
+import PainelInicioResponsavel, { type PendingEvent } from "@/components/PainelInicioResponsavel";
 import TabBar from "@/components/TabBar";
 import { type AtividadeItem } from "@/components/Atividades";
 import PendenciasTab, { type Atrasada } from "@/components/PendenciasTab";
@@ -100,11 +100,17 @@ export default function ResponsavelDashboard({
 
           <ResumoFeitasCard criancas={criancas} resumo={resumoFeitas} />
 
-          <h2 className="text-lg font-semibold mt-6">Aguardando confirmação/autorização</h2>
-          <p className="text-sm text-slate-400 mb-3">
-            Não esqueça de conferir se a tarefa foi feita... e bem feita. Talvez tenha algo que precise ser ensinado.
-          </p>
-          <ConfirmQueue familyId={familyId} events={pending} />
+          <div className="mt-6">
+            <PainelInicioResponsavel
+              familyId={familyId}
+              events={pending}
+              atrasadas={atrasadas}
+              catalog={catalog}
+              criancas={criancas}
+              hojeISO={hojeISO}
+              onIrParaPendencias={() => setTab("pendencias")}
+            />
+          </div>
         </>
       )}
 

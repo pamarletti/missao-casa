@@ -103,6 +103,21 @@ const PERIODOS = [
 
 type PeriodoKey = (typeof PERIODOS)[number]["key"];
 
+/** O caminho inteiro de um pedido de bônus, do "quero fazer" até a
+ * resposta — e como cada etapa aparece pro menino.
+ *
+ * O "não autorizado" é o que faltava: até aqui ele simplesmente sumia da
+ * tela, e o menino ficava sem saber se o pedido tinha sido recusado ou se
+ * ninguém tinha visto ainda. */
+const ETAPA_DO_BONUS: Record<string, { texto: string; cor: string }> = {
+  aguardando_autorizacao: { texto: "esperando liberação", cor: "text-amber-400" },
+  liberada: { texto: "autorizado! pode fazer", cor: "text-green-400" },
+  aguardando_confirmacao: { texto: "feito — esperando confirmação", cor: "text-amber-400" },
+  pedido_para_refazer: { texto: "pediram para refazer", cor: "text-amber-400" },
+  confirmado: { texto: "feito e confirmado ✓", cor: "text-green-400" },
+  nao_feito: { texto: "não autorizado", cor: "text-red-400" },
+};
+
 /** Frase curta no topo de cada aba, explicando pro menino o que ele está
  * vendo ali. A aba Início não tem — os próprios cards já se explicam. */
 function TextoDaAba({ children }: { children: React.ReactNode }) {
@@ -525,10 +540,23 @@ export default function CriancaDashboard({
   );
   const nomeDaTarefa = (taskId: string) => catalog.find((t) => t.id === taskId)?.name ?? "Tarefa";
 
-  const pendentesProprios = eventosMes.filter((e) =>
-    ["aguardando_autorizacao", "aguardando_confirmacao"].includes(e.status)
+  // Os bônus ganharam bloco próprio (logo abaixo), com o caminho inteiro do
+  // pedido. Aqui ficam só as obrigatórias, pra mesma marcação não aparecer
+  // duas vezes na tela.
+  const idsDeBonus = new Set(catalog.filter((t) => t.categoria === "coletiva").map((t) => t.id));
+  const pendentesProprios = eventosMes.filter(
+    (e) =>
+      !idsDeBonus.has(e.task_id) &&
+      ["aguardando_autorizacao", "aguardando_confirmacao"].includes(e.status)
   );
   const valorPendente = pendentesProprios.reduce((acc, e) => acc + Number(e.valor), 0);
+
+  // Pedidos de bônus do mês, do mais novo pro mais velho.
+  const pedidosDeBonus = eventosMes
+    .filter((e) => idsDeBonus.has(e.task_id) && ETAPA_DO_BONUS[e.status])
+    .slice()
+    .sort((a, b) => (a.data < b.data ? 1 : -1))
+    .slice(0, 12);
 
   // Progresso e projeção: quanto dá pra ganhar fazendo tudo que é
   // obrigatório (individual + individual-coletiva — as coletivas são
@@ -835,6 +863,58 @@ export default function CriancaDashboard({
               </ul>
             </section>
           )}
+
+          <section className="mb-6">
+            <h2 className="text-lg font-semibold mb-1">🎁 Meus pedidos de bônus</h2>
+            <p className="text-sm text-slate-400 mb-3">
+              Tudo o que você pediu para fazer neste mês, e no que deu.
+            </p>
+            {pedidosDeBonus.length > 0 ? (
+              <ul className="space-y-2">
+                {pedidosDeBonus.map((e) => {
+                  const etapa = ETAPA_DO_BONUS[e.status];
+                  const tarefa = catalog.find((t) => t.id === e.task_id);
+                  return (
+                    <li key={e.id} className="card flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-medium">{tarefa?.name ?? "Tarefa"}</p>
+                        <p className={`text-sm ${etapa.cor}`}>
+                          {etapa.texto}
+                          <span className="text-slate-500">
+                            {" · "}
+                            {new Date(e.data + "T00:00:00").toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 sm:shrink-0">
+                        {e.status === "liberada" && (
+                          <form action={markColetivaDone.bind(null, e.id)}>
+                            <BotaoAcao className="btn-primary text-xs px-3 py-1">Feito</BotaoAcao>
+                          </form>
+                        )}
+                        {["aguardando_autorizacao", "aguardando_confirmacao", "liberada"].includes(e.status) && (
+                          <BotaoDireto
+                            className="text-xs text-slate-500 underline disabled:opacity-40"
+                            acao={() => cancelarPropriaMarcacao(e.id)}
+                          >
+                            {e.status === "liberada" ? "desistir" : "cancelar"}
+                          </BotaoDireto>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-400">
+                Você ainda não pediu nenhum bônus neste mês. A aba Bônus tem a lista do que dá para fazer.
+              </p>
+            )}
+          </section>
 
           <section className="mb-6">
             <div className="flex items-center justify-between mb-3 gap-2">

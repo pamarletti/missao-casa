@@ -475,6 +475,38 @@ export default function CriancaDashboard({
     );
   }
 
+  /** Um bloco da aba Início: título, a grade de tarefas e uma frase para
+   * quando não há nada. As três listas da Início têm exatamente esta forma,
+   * e é a mesma grade das outras abas — o menino age direto dali, sem
+   * precisar sair procurando a tarefa em outro lugar. */
+  function Sugestoes({
+    titulo,
+    tarefas,
+    vazio,
+    verde = true,
+  }: {
+    titulo: string;
+    tarefas: Tarefa[];
+    vazio: string;
+    /** Vazio em verde é elogio ("está tudo feito"); em cinza é só um aviso. */
+    verde?: boolean;
+  }) {
+    return (
+      <section className="mb-6">
+        <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+        {tarefas.length > 0 ? (
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {tarefas.map((t) => (
+              <TarefaRow key={t.id} t={t} />
+            ))}
+          </ul>
+        ) : (
+          <p className={`text-sm ${verde ? "text-green-400" : "text-slate-400"}`}>{vazio}</p>
+        )}
+      </section>
+    );
+  }
+
   /** Lista de Hoje / Esta semana: agrupada por categoria (as tarefas só
    * suas, as do espaço compartilhado, as da família), com as seções já
    * abertas — é a lista do dia, o menino precisa ver na hora. O Bônus e o
@@ -633,24 +665,36 @@ export default function CriancaDashboard({
   // ainda não foram feitas — inclusive as marcadas como "não feito", que
   // continuam valendo enquanto a janela não virar. Tarefas que não valem
   // hoje (sexta/sábado, pra quem pula fim de semana) nunca entram aqui.
-  const diariasEmRisco = obrigatoriasHoje.filter((t) => t.frequencia === "diaria" && ehMinhaVez(t) && aindaDaTempo(t));
-  const valorEmRiscoHoje = diariasEmRisco.reduce(
+  // O que ainda falta HOJE: as diárias e as semanais que caem neste dia —
+  // nestas o prazo é o próprio dia, então elas são de hoje, não da semana.
+  const faltandoHoje = obrigatoriasHoje.filter(
+    (t) =>
+      (t.frequencia === "diaria" || (t.frequencia === "semanal" && temDiaCerto(t))) &&
+      ehMinhaVez(t) &&
+      aindaDaTempo(t)
+  );
+  const valorEmRiscoHoje = faltandoHoje.reduce(
     (acc, t) => acc + Number(t.valor_unitario) * vagasRestantes(t).vagas,
     0
   );
 
-  const semanaisEmRisco = obrigatorias.filter((t) => t.frequencia === "semanal" && ehMinhaVez(t) && aindaDaTempo(t));
-  const valorEmRiscoSemana = semanaisEmRisco.reduce((acc, t) => acc + Number(t.valor_unitario), 0);
-
-  // "Tem um tempinho?": até 4 sugestões de tarefas rápidas pra fazer agora,
-  // priorizando obrigatórias diárias, depois semanais, depois coletivas.
-  // Só entram tarefas com alguma ação disponível nesse momento — sem
-  // nenhuma marcação ainda, ou coletivas já liberadas esperando só o
-  // "Feito" — nunca as que já foram feitas ou já estão decididas.
-  const coletivasSugeridas = coletivas.filter(
-    (t) => aindaDaTempo(t) || eventosDaJanela(t).some((e) => e.status === "liberada")
+  // O que falta ATÉ O FIM DA SEMANA: as semanais sem dia marcado, que valem
+  // a semana inteira e só vencem no domingo à noite.
+  const faltandoSemana = obrigatorias.filter(
+    (t) => t.frequencia === "semanal" && !temDiaCerto(t) && ehMinhaVez(t) && aindaDaTempo(t)
   );
-  const sugestoesTempinho = [...diariasEmRisco, ...semanaisEmRisco, ...coletivasSugeridas].slice(0, 4);
+  const valorEmRiscoSemana = faltandoSemana.reduce((acc, t) => acc + Number(t.valor_unitario), 0);
+
+  // "Para ganhar mais": as de bônus que dá para pedir agora, das que mais
+  // rendem para as que menos rendem — a pergunta que o bloco responde é
+  // "quanto dá para eu ganhar a mais", então o valor é o que ordena.
+  // Só entram as que têm alguma ação disponível neste momento: sem pedido
+  // nenhum ainda, ou já liberadas esperando só o "Feito".
+  const bonusSugeridos = coletivas
+    .filter((t) => aindaDaTempo(t) || eventosDaJanela(t).some((e) => e.status === "liberada"))
+    .slice()
+    .sort((a, b) => Number(b.valor_unitario) - Number(a.valor_unitario))
+    .slice(0, 6);
 
   return (
     <div>
@@ -679,18 +723,24 @@ export default function CriancaDashboard({
             </div>
           </div>
 
-          <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">🙌 Tem um tempinho? Aí vão algumas sugestões:</h2>
-            {sugestoesTempinho.length > 0 ? (
-              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {sugestoesTempinho.map((t) => (
-                  <TarefaRow key={t.id} t={t} />
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-green-400">Você já deu conta de tudo por enquanto! 🎉</p>
-            )}
-          </section>
+          <Sugestoes
+            titulo="⏳ Ainda está faltando hoje"
+            tarefas={faltandoHoje}
+            vazio="Nada faltando por hoje — está tudo em dia! 🎉"
+          />
+
+          <Sugestoes
+            titulo="📅 Ainda está faltando esta semana"
+            tarefas={faltandoSemana}
+            vazio="Nada faltando para esta semana ✓"
+          />
+
+          <Sugestoes
+            titulo="✨ Para ganhar mais você pode fazer..."
+            tarefas={bonusSugeridos}
+            vazio="Por enquanto não tem bônus disponível para pedir."
+            verde={false}
+          />
 
           <div className="card mb-4">
             <p className="text-sm text-slate-400 mb-3">⏰ Tempo restante</p>

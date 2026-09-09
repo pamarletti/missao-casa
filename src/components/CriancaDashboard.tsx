@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { ReactNode } from "react";
 import {
   markOrRequest,
   markColetivaDone,
@@ -114,7 +115,6 @@ const ETAPA_DO_BONUS: Record<string, { texto: string; cor: string }> = {
   liberada: { texto: "autorizado! pode fazer", cor: "text-green-400" },
   aguardando_confirmacao: { texto: "feito — esperando confirmação", cor: "text-amber-400" },
   pedido_para_refazer: { texto: "pediram para refazer", cor: "text-amber-400" },
-  confirmado: { texto: "feito e confirmado ✓", cor: "text-green-400" },
   nao_feito: { texto: "não autorizado", cor: "text-red-400" },
 };
 
@@ -479,12 +479,41 @@ export default function CriancaDashboard({
    * quando não há nada. As três listas da Início têm exatamente esta forma,
    * e é a mesma grade das outras abas — o menino age direto dali, sem
    * precisar sair procurando a tarefa em outro lugar. */
+  /** Bloco do Início que abre e fecha, com a mesma seta das listas das
+   * outras abas. Nasce aberto; a partir do primeiro clique manda a
+   * escolha do menino, lembrada enquanto ele estiver no perfil. */
+  function BlocoInicio({
+    chave,
+    titulo,
+    contagem,
+    children,
+  }: {
+    chave: string;
+    titulo: string;
+    contagem: number;
+    children: ReactNode;
+  }) {
+    const id = `inicio:${chave}`;
+    return (
+      <SecaoExpansivel
+        titulo={titulo}
+        contagem={contagem}
+        aberta={!secoesAbertas.has(id)}
+        onAlternar={() => alternarSecao(id)}
+      >
+        {children}
+      </SecaoExpansivel>
+    );
+  }
+
   function Sugestoes({
+    chave,
     titulo,
     tarefas,
     vazio,
     verde = true,
   }: {
+    chave: string;
     titulo: string;
     tarefas: Tarefa[];
     vazio: string;
@@ -492,8 +521,7 @@ export default function CriancaDashboard({
     verde?: boolean;
   }) {
     return (
-      <section className="mb-6">
-        <h2 className="text-lg font-semibold mb-3">{titulo}</h2>
+      <BlocoInicio chave={chave} titulo={titulo} contagem={tarefas.length}>
         {tarefas.length > 0 ? (
           <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {tarefas.map((t) => (
@@ -503,7 +531,7 @@ export default function CriancaDashboard({
         ) : (
           <p className={`text-sm ${verde ? "text-green-400" : "text-slate-400"}`}>{vazio}</p>
         )}
-      </section>
+      </BlocoInicio>
     );
   }
 
@@ -724,18 +752,21 @@ export default function CriancaDashboard({
           </div>
 
           <Sugestoes
+            chave="faltando-hoje"
             titulo="⏳ Ainda está faltando hoje"
             tarefas={faltandoHoje}
             vazio="Nada faltando por hoje — está tudo em dia! 🎉"
           />
 
           <Sugestoes
+            chave="faltando-semana"
             titulo="📅 Ainda está faltando esta semana"
             tarefas={faltandoSemana}
             vazio="Nada faltando para esta semana ✓"
           />
 
           <Sugestoes
+            chave="ganhar-mais"
             titulo="✨ Para ganhar mais você pode fazer..."
             tarefas={bonusSugeridos}
             vazio="Por enquanto não tem bônus disponível para pedir."
@@ -863,8 +894,11 @@ export default function CriancaDashboard({
           </div>
 
           {(trocasRecebidas.length > 0 || trocasEnviadas.length > 0) && (
-            <section className="mb-6">
-              <h2 className="text-lg font-semibold mb-1">🤝 Combinados com seu irmão</h2>
+            <BlocoInicio
+              chave="combinados"
+              titulo="🤝 Combinados com seu irmão"
+              contagem={trocasRecebidas.length + trocasEnviadas.length}
+            >
               <p className="text-sm text-slate-400 mb-3">
                 Se você aceitar, a tarefa passa a ser sua hoje — e o valor dela também.
               </p>
@@ -911,13 +945,16 @@ export default function CriancaDashboard({
                   </li>
                 ))}
               </ul>
-            </section>
+            </BlocoInicio>
           )}
 
-          <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-1">🎁 Meus pedidos de bônus</h2>
+          <BlocoInicio
+            chave="pedidos-bonus"
+            titulo="🎁 Meus pedidos de bônus"
+            contagem={pedidosDeBonus.length}
+          >
             <p className="text-sm text-slate-400 mb-3">
-              Tudo o que você pediu para fazer neste mês, e no que deu.
+              Os bônus que você pediu neste mês e ainda estão andando.
             </p>
             {pedidosDeBonus.length > 0 ? (
               <ul className="space-y-2">
@@ -961,20 +998,21 @@ export default function CriancaDashboard({
               </ul>
             ) : (
               <p className="text-sm text-slate-400">
-                Você ainda não pediu nenhum bônus neste mês. A aba Bônus tem a lista do que dá para fazer.
+                Nenhum bônus seu esperando resposta agora. A aba Bônus tem a lista do que dá para fazer.
               </p>
             )}
-          </section>
+          </BlocoInicio>
 
-          <section className="mb-6">
-            <div className="flex items-center justify-between mb-3 gap-2">
-              <h2 className="text-lg font-semibold">Confirmações e autorizações pendentes</h2>
-              {pendentesProprios.length > 0 && (
-                <span className="text-sm font-semibold text-amber-400 shrink-0">
-                  R$ {reais(valorPendente)} pendente
-                </span>
-              )}
-            </div>
+          <BlocoInicio
+            chave="pendentes"
+            titulo="Confirmações e autorizações pendentes"
+            contagem={pendentesProprios.length}
+          >
+            {pendentesProprios.length > 0 && (
+              <p className="text-sm font-semibold text-amber-400 mb-3">
+                R$ {reais(valorPendente)} pendente
+              </p>
+            )}
             {pendentesProprios.length > 0 ? (
               <ul className="space-y-2">
                 {pendentesProprios.map((e) => {
@@ -1000,7 +1038,7 @@ export default function CriancaDashboard({
             ) : (
               <p className="text-sm text-green-400">Tudo confirmado e autorizado por aqui! ✓</p>
             )}
-          </section>
+          </BlocoInicio>
         </>
       )}
 
